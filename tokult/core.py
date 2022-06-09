@@ -1,11 +1,13 @@
 '''Core modules of tokult.
 '''
+from __future__ import annotations
 import numpy as np
 from scipy.signal import convolve2d
 from astropy.io import fits
+from astropy import wcs
 from typing import Sequence, Optional, Union, Callable
 from . import common as c
-from . import fitting as fit
+from . import fitting
 
 
 ##
@@ -15,15 +17,57 @@ class Tokult:
     Users manage tokult methods via this class.
     '''
 
-    def __init__(self) -> None:
-        pass
+    def __init__(
+        self,
+        datacube: DataCube,
+        dirtybeam: Optional[DirtyBeam] = None,
+        gravlenz: Optional[GravLenz] = None,
+    ) -> None:
+        self.datacube = datacube
+        self.dirtybeam = dirtybeam
+        self.gravlenz = gravlenz
+
+    @classmethod
+    def launch(
+        cls,
+        data: Union[np.ndarray, str],
+        beam: Union[np.ndarray, str, None] = None,
+        gravlenz: Union[
+            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str], None
+        ] = None,
+        header_data: Optional[fits.Header] = None,
+        header_beam: Optional[fits.Header] = None,
+        header_gamma: Optional[fits.Header] = None,
+        index_data: int = 0,
+        index_beam: int = 0,
+        index_gamma: int = 0,
+    ):
+        '''Constructer of Tokult.
+        '''
+        datacube = DataCube.create(data, header=header_data, index_hdul=index_data)
+
+        dirtybeam: Optional[DirtyBeam]
+        if beam:
+            dirtybeam = DirtyBeam.create(
+                beam, header=header_beam, index_hdul=index_beam
+            )
+        else:
+            dirtybeam = None
+
+        gl: Optional[GravLenz]
+        if gravlenz is not None:
+            g1, g2, k = gravlenz
+            gl = GravLenz.create(g1, g2, k, header=header_gamma, index_hdul=index_gamma)
+        else:
+            gl = None
+        return cls(datacube, dirtybeam, gl)
 
     def image_fit(
         self, init: Sequence[float], bound: Sequence[float], func_fit: Callable
     ):
         '''First main function to fit 3d model to data cube on image plane.
         '''
-        sol = fit.least_square(self.datacube, init, bound, func_fit)
+        sol = fitting.least_square(self.datacube, init, bound, func_fit)
         return sol
 
     def uv_fit(self):
@@ -31,52 +75,103 @@ class Tokult:
         '''
         pass
 
+    def set_region(
+        self,
+        xlim: Optional[tuple[int, int]] = None,
+        ylim: Optional[tuple[int, int]] = None,
+        vlim: Optional[tuple[int, int]] = None,
+    ) -> None:
+        '''Set region of datacube used for fitting.
+        '''
+        self.datacube.cutout(xlim, ylim, vlim)
+        if self.dirtybeam is not None:
+            self.dirtybeam.cutout_to_match_with(self.datacube)
+        if self.gravlenz is not None:
+            self.gravlenz.match_wcs_with(self.datacube)
+
     def set_datacube(
         self,
-        fname: str,
-        xlim: Optional[tuple[int, ...]] = None,
-        ylim: Optional[tuple[int, ...]] = None,
-        vlim: Optional[tuple[int, ...]] = None,
+        data_or_fname: Union[np.ndarray, str],
+        header: Optional[fits.Header] = None,
+        index_hdul: int = 0,
+        xlim: Optional[tuple[int, int]] = None,
+        ylim: Optional[tuple[int, int]] = None,
+        vlim: Optional[tuple[int, int]] = None,
     ) -> None:
         '''Set datacube into DataCube class.
         '''
-        self.datacube = DataCube(fname)
-        self.datacube.coordinate()
+        self.datacube = DataCube.create(
+            data_or_fname, header=header, index_hdul=index_hdul
+        )
+        self.set_region(xlim, ylim, vlim)
 
-    def set_dirtybeam(self, fname: str) -> None:
+    def set_dirtybeam(
+        self,
+        data_or_fname: Union[np.ndarray, str],
+        header: Optional[fits.Header] = None,
+        index_hdul: int = 0,
+    ) -> None:
         '''Set dirtybeam data into DirtyBeam class.
         '''
-        self.dirtybeam = DirtyBeam(fname)
+        self.dirtybeam = DirtyBeam.create(
+            data_or_fname, header=header, index_hdul=index_hdul
+        )
 
-    def set_gravlenz(self, gamma1: str, gamma2: str, kappa: str) -> None:
+    def set_gravlenz(
+        self,
+        data_or_fname: Union[
+            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str]
+        ],
+        header: Optional[fits.Header] = None,
+        index_hdul: int = 0,
+    ) -> None:
         '''Set gravitational lenzing data into GravLenz class.
         '''
-        self.gravlenz = GravLenz(gamma1, gamma2, kappa)
+        g1, g2, k = data_or_fname
+        self.gravlenz = GravLenz.create(g1, g2, k, header=header, index_hdul=index_hdul)
 
 
 class Cube:
     '''Contains cube data and related methods.
     '''
 
-    def __init__(self) -> None:
-        self.imageplane: np.ndarray
+    def __init__(
+        self, imageplane: np.ndarray, header: Optional[fits.Header] = None,
+    ) -> None:
+        self.original = imageplane
+        self.imageplane = imageplane
+        self.header = header
 
-    def coordinate(
+        self.xlim: tuple[int, int]
+        self.ylim: tuple[int, int]
+        self.vlim: tuple[int, int]
+        self.vgrid: np.ndarray
+        self.xgrid: np.ndarray
+        self.ygrid: np.ndarray
+        self.coord_imageplane: list[np.ndarray]
+        self.cutout()
+
+    def cutout(
         self,
-        xlim: Optional[tuple[int, ...]] = None,
-        ylim: Optional[tuple[int, ...]] = None,
-        vlim: Optional[tuple[int, ...]] = None,
+        xlim: Optional[tuple[int, int]] = None,
+        ylim: Optional[tuple[int, int]] = None,
+        vlim: Optional[tuple[int, int]] = None,
     ) -> None:
         '''Create coordinates of data cube.
         '''
-        xlow, xup = xlim if xlim else 0, self.imageplane.shape[2] - 1
-        ylow, yup = ylim if ylim else 0, self.imageplane.shape[1] - 1
-        vlow, vup = vlim if vlim else 0, self.imageplane.shape[0] - 1
+        self.xlim = xlim if xlim else (0, self.imageplane.shape[2])
+        self.ylim = ylim if ylim else (0, self.imageplane.shape[1])
+        self.vlim = vlim if vlim else (0, self.imageplane.shape[0])
+        self.xslice = slice(*self.xlim)
+        self.yslice = slice(*self.ylim)
+        self.vslice = slice(*self.vlim)
 
-        xarray = np.arange(xlow, xup + 1)
-        yarray = np.arange(ylow, yup + 1)
-        varray = np.arange(vlow, vup + 1)
-        self.coord_imageplane = np.meshgrid(varray, xarray, yarray, indexing='ij')
+        xarray = np.arange(self.xlim[0], self.xlim[1])
+        yarray = np.arange(self.ylim[0], self.ylim[1])
+        varray = np.arange(self.vlim[0], self.vlim[1])
+        self.coord_imageplane = np.meshgrid(varray, yarray, xarray, indexing='ij')
+        self.vgrid, self.xgrid, self.ygrid = self.coord_imageplane
+        self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
 
     def get_rms(self):
         '''Return rms noise of the datacube.
@@ -88,8 +183,37 @@ class Cube:
             # FIXME: Write code to compute rms as a function of frequency.
             return self.rms
 
+    def moment0(self) -> np.ndarray:
+        '''Return moment 0 maps using pixel indicies.
+        '''
+        return np.sum(self.imageplane, axis=0)
+
+    def pixmoment1(self, thresh: float = 0.0) -> np.ndarray:
+        '''Return moment 1 maps using pixel indicies.
+
+        This funciton uses pixel indicies instead of velocity; that is,
+        the units of moment 1 is pixel.
+        '''
+        mom0 = self.moment0()
+        mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
+        mom1[mom0 <= thresh] = None
+        return mom1
+
+    def pixmoment2(self, thresh: float = 0.0) -> np.ndarray:
+        '''Return moment 1 maps using pixel indicies.
+
+        This funciton uses pixel indicies instead of velocity; that is,
+        the units of moment 2 maps is pixel.
+        '''
+        mom0 = self.moment0()
+        mom1 = self.pixmoment1()
+        vv = self.vgrid - mom1[np.newaxis, ...]
+        mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / mom0
+        mom2[mom0 <= thresh] = None
+        return mom2
+
     def get_pixmoments(
-        self, imom: int = 0, mask_minmom0: float = 0.0, recalc: bool = False
+        self, imom: int = 0, thresh: float = 0.0, recalc: bool = False
     ) -> np.ndarray:
         '''Return moment maps using pixel indicies.
 
@@ -116,9 +240,8 @@ class Cube:
                 except AttributeError:
                     pass
             mom0 = self.get_pixmoments(imom=0)
-            varray = self.coord_imageplane[0]
-            self.mom1 = np.sum(self.imageplane * varray, axis=0) / mom0
-            self.mom1[mom0 <= mask_minmom0] = None
+            self.mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
+            self.mom1[mom0 <= thresh] = None
             return self.mom1
         if imom == 2:
             if not recalc:
@@ -127,10 +250,9 @@ class Cube:
                 except AttributeError:
                     pass
             mom1 = self.get_pixmoments(imom=1)
-            varray = self.coord_imageplane[0]
-            vv = varray - mom1[np.newaxis, ...]
+            vv = self.vgrid - mom1[np.newaxis, ...]
             self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
-            self.mom2[self.mom0 <= mask_minmom0] = None
+            self.mom2[self.mom0 <= thresh] = None
             return self.mom2
 
         message = 'An input "imom" should be the int type of 0, 1, or 2.'
@@ -142,26 +264,36 @@ class DataCube(Cube):
     '''Cube class to contain an observed datacube.
     '''
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
-    ) -> None:
+    ) -> DataCube:
+        '''Constructer.
+        '''
         if isinstance(data_or_fname, np.ndarray):
-            self.imageplane = data_or_fname
-            self.header = header
+            return cls(data_or_fname, header)
         elif isinstance(data_or_fname, str):
-            self.readfile(data_or_fname, index_hdul=index_hdul)
-        self.coordinate()
+            imageplane, header = cls.loadfits(data_or_fname, index_hdul=index_hdul)
+            return cls(imageplane, header)
+        message = (
+            f'The first input must be np.ndarray or str, '
+            f'but the input type is {type(data_or_fname)}.'
+        )
+        c.logger.error(message)
+        raise TypeError(message)
 
-    def readfile(self, fname: str, index_hdul: int = 0) -> None:
+    @staticmethod
+    def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
         '''Read cube data from fits file.
         '''
         with fits.open(fname) as hdul:
-            # np.squeeze is needed to erase polari info.
-            self.imageplane = np.squeeze(hdul[index_hdul].data)
-            self.header = hdul[index_hdul].header
+            # np.squeeze is needed to erase the polari axis.
+            imageplane = np.squeeze(hdul[index_hdul].data)
+            header = hdul[index_hdul].header
+        return imageplane, header
 
 
 class ModelCube(Cube):
@@ -177,19 +309,69 @@ class DirtyBeam:
     Contained data is dirtybeam images as a function of frequency.
     '''
 
-    def __init__(
-        self,
+    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
+        self.original = beam
+        self.beam = beam
+        self.header = header
+
+    @classmethod
+    def create(
+        cls,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
-    ) -> None:
+    ) -> DirtyBeam:
+        '''Constructer
+        '''
         if isinstance(data_or_fname, np.ndarray):
-            self.pfs = data_or_fname
-            self.header = header
+            return cls(data_or_fname, header)
         elif isinstance(data_or_fname, str):
-            self.readfile(data_or_fname, index_hdul=index_hdul)
+            beam, header = cls.loadfits(data_or_fname, index_hdul=index_hdul)
+            return cls(beam, header)
+        message = (
+            f'The first input must be np.ndarray or str, '
+            f'but the input type is {type(data_or_fname)}.'
+        )
+        c.logger.error(message)
+        raise TypeError(message)
 
-    def readfile(self, fname: str, index_hdul: int = 0) -> None:
+    def convolve(self, image: np.ndarray) -> np.ndarray:
+        '''Convolve image with dirtybeam (psf).
+        '''
+        # s1 = np.arange(c.conf.kernel_num)
+        # t1 = np.arange(c.conf.kernel_num)
+        # s2, t2 = np.meshgrid(s1, t1)
+        # s3 = c.conf.num_pix / 2 - (c.conf.kernel_num - 1) / 2 + s2
+        # t3 = c.conf.num_pix / 2 - (c.conf.kernel_num - 1) / 2 + t2
+        # st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
+        # kernel = self.beam[st]
+        # kernel2 = kernel / np.sum(kernel)
+        kernel = self.beam / np.sum(self.beam)
+        return convolve2d(image, kernel, mode='same')
+
+    def cutout(
+        self,
+        xlim: Union[tuple[int, int], slice],
+        ylim: Union[tuple[int, int], slice],
+        vlim: Union[tuple[int, int], slice],
+    ) -> None:
+        '''Cutout a cubic region from the dirty beam map.
+        '''
+        xslice = slice(*xlim) if isinstance(xlim, tuple) else xlim
+        yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
+        vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
+        self.beam = self.original[vslice, yslice, xslice]
+
+    def cutout_to_match_with(self, cube: DataCube) -> None:
+        '''Cutout a cubic region from the dirty beam map.
+        '''
+        xslice = cube.xslice
+        yslice = cube.yslice
+        vslice = cube.vslice
+        self.cutout(xslice, yslice, vslice)
+
+    @staticmethod
+    def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
         '''Read dirtybeam from fits file.
 
         CAUTION:
@@ -198,21 +380,9 @@ class DirtyBeam:
         files are simulationsly created.
         '''
         with fits.open(fname) as hdul:
-            self.pfs = hdul[index_hdul].data
-            self.header = hdul[index_hdul].header
-
-    def convolve(self, image):
-        '''Convolve image with dirtybeam (psf).
-        '''
-        s1 = np.arange(c.conf.kernel_num)
-        t1 = np.arange(c.conf.kernel_num)
-        s2, t2 = np.meshgrid(s1, t1)
-        s3 = c.conf.num_pix / 2 - (c.conf.kernel_num - 1) / 2 + s2
-        t3 = c.conf.num_pix / 2 - (c.conf.kernel_num - 1) / 2 + t2
-        st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
-        kernel = self.pfs[st]
-        kernel2 = kernel / sum(sum(kernel))
-        return convolve2d(image, kernel2, 'same')
+            beam = hdul[index_hdul].data
+            header = hdul[index_hdul].header
+        return np.squeeze(beam), header
 
 
 class GravLenz:
@@ -223,15 +393,33 @@ class GravLenz:
 
     def __init__(
         self,
+        gamma1: np.ndarray,
+        gamma2: np.ndarray,
+        kappa: np.ndarray,
+        header: Optional[fits.Header] = None,
+    ) -> None:
+        self.original_gamma1 = gamma1
+        self.original_gamma2 = gamma2
+        self.original_kappa = kappa
+        self.gamma1 = gamma1
+        self.gamma2 = gamma2
+        self.kappa = kappa
+        self.header = header
+
+    @classmethod
+    def create(
+        cls,
         data_or_fname_gamma1: Union[np.ndarray, str],
         data_or_fname_gamma2: Union[np.ndarray, str],
         data_or_fname_kappa: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
-    ) -> None:
+    ) -> GravLenz:
+        '''Constructer
+        '''
         if not (
             isinstance(data_or_fname_gamma1, type(data_or_fname_gamma2))
-            & isinstance(data_or_fname_gamma1, type(data_or_fname_kappa))
+            and isinstance(data_or_fname_gamma1, type(data_or_fname_kappa))
         ):
             message = (
                 f'Types of inputs for gamma1, gamma2, kappa are different: '
@@ -245,38 +433,29 @@ class GravLenz:
         if isinstance(data_or_fname_gamma1, np.ndarray):
             assert isinstance(data_or_fname_gamma2, np.ndarray)
             assert isinstance(data_or_fname_kappa, np.ndarray)
-            self.gamma1 = data_or_fname_gamma1
-            self.gamma2 = data_or_fname_gamma2
-            self.kappa = data_or_fname_kappa
-            self.header = header
+            gamma1 = data_or_fname_gamma1
+            gamma2 = data_or_fname_gamma2
+            kappa = data_or_fname_kappa
+            return cls(gamma1, gamma2, kappa, header)
         elif isinstance(data_or_fname_gamma1, str):
             assert isinstance(data_or_fname_gamma2, str)
             assert isinstance(data_or_fname_kappa, str)
-            self.readfile(
+            loaded = cls.loadfits(
                 data_or_fname_gamma1,
                 data_or_fname_gamma2,
                 data_or_fname_kappa,
                 index_hdul=index_hdul,
             )
+            return cls(*loaded)
 
-    def readfile(
-        self,
-        fname_gamma1: str,
-        fname_gamma2: str,
-        fname_kappa: str,
-        index_hdul: int = 0,
-    ) -> None:
-        '''Read gravlenz from fits file.
-        '''
-        with fits.open(fname_gamma1) as hdul:
-            self.gamma1 = hdul[index_hdul].data
-            self.header = hdul[index_hdul].header
-        with fits.open(fname_gamma2) as hdul:
-            self.gamma2 = hdul[index_hdul].data
-        with fits.open(fname_kappa) as hdul:
-            self.kappa = hdul[index_hdul].data
+        message = (
+            f'The first input must be np.ndarray or str, '
+            f'but the input type is {type(data_or_fname_gamma1)}.'
+        )
+        c.logger.error(message)
+        raise TypeError(message)
 
-    def lenz_image2source(self, coordinates: np.ndarray) -> np.ndarray:
+    def lenzing(self, coordinates: np.ndarray) -> np.ndarray:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
         This method use gravitational lenzing parameters: gamma1, gamma2, and kappa.
@@ -294,3 +473,32 @@ class GravLenz:
         # assert jacob.shape == (n, m, 2, 2)
         _coord = coordinates[..., np.newaxis]
         return np.squeeze(jacob @ _coord)
+
+    def match_wcs_with(self, cube: DataCube):
+        '''Match the world coordinate system with input data.
+        '''
+        wcs_cube = wcs.WCS(cube.header)
+        wcs_gl = wcs.WCS(self.header)
+        skycoord_wcs, _, _ = wcs_cube.pixel_to_world(
+            cube.xgrid[0, :, :].ravel(), cube.ygrid[0, :, :].ravel(), 0, 0
+        )
+        idx = wcs_gl.world_to_array_index(skycoord_wcs)
+        shape = cube.xgrid.shape[1:]
+        self.gamma1 = self.original_gamma1[idx].reshape(*shape)
+        self.gamma2 = self.original_gamma2[idx].reshape(*shape)
+        self.kappa = self.original_kappa[idx].reshape(*shape)
+
+    @staticmethod
+    def loadfits(
+        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
+        '''Read gravlenz from fits file.
+        '''
+        with fits.open(fname_gamma1) as hdul:
+            gamma1 = hdul[index_hdul].data
+            header = hdul[index_hdul].header
+        with fits.open(fname_gamma2) as hdul:
+            gamma2 = hdul[index_hdul].data
+        with fits.open(fname_kappa) as hdul:
+            kappa = hdul[index_hdul].data
+        return gamma1, gamma2, kappa, header

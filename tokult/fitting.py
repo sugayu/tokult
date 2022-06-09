@@ -3,10 +3,10 @@
 from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares
-import scipy.special as sps
 from typing import Callable, Sequence, Optional, TYPE_CHECKING
 from numpy.typing import ArrayLike
-from .misc import rotate_coord, polar_coord
+from . import function as func
+from .misc import rotate_coord, polar_coord, no_lenzing, no_convolve
 
 if TYPE_CHECKING:
     from .core import DataCube, DirtyBeam, GravLenz
@@ -18,15 +18,15 @@ data: input DataCube contaning images.
 xx_grid: coordinate indices of x for the image datacube.
 yy_grid: coordinate indices of y for the image datacube.
 vv_grid: coordinate indices of v for the image datacube.
-pfs: DirtyBeam contaning dirtybeam (pfs) of the input datacube.
-gl: GravLenz containing infomation to convert coordinates using gravitational lenzing.
+convolve: a function to convolve the input datacube. Method of DirtyBeam.
+lenzing: a function to convert source plane to image plane. Method of GravLenz.
 '''
 data: DataCube
 xx_grid: np.ndarray
 yy_grid: np.ndarray
 vv_grid: np.ndarray
-pfs: DirtyBeam
-gl: GravLenz
+lenzing: Callable = no_lenzing
+convolve: Callable = no_convolve
 
 
 def least_square(
@@ -40,20 +40,22 @@ def least_square(
 ) -> Solution:
     '''Least square fitting using scipy.optimize.least_squares
     '''
-    global data, xx_grid, yy_grid, vv_grid, pfs, gl
+    global data, xx_grid, yy_grid, vv_grid, lenzing, convolve
     data = data_in
     xx_grid, yy_grid, vv_grid = data_in.coord_imageplane
     if pfs_in:
-        pfs = pfs_in
+        convolve = pfs_in.convolve
     if gl_in:
-        gl = gl_in
+        lenzing = gl_in.lenzing
 
-    args_get_chi = (func_fit, data.imageplane, data.get_rms(), mask_use)
-    output = least_squares(get_chi, init, args=args_get_chi, bounds=bound)
+    args = (func_fit, data.imageplane, data.get_rms(), mask_use)
+    output = least_squares(calculate_chi, init, args=args, bounds=bound)
 
     p_bestfit = output.x
     dof = len(data.imageplane) - 1 - len(init)
-    chi2 = np.sum(get_chi(p_bestfit, func_fit, data.imageplane, data.get_rms()) ** 2.0)
+    chi2 = np.sum(
+        calculate_chi(p_bestfit, func_fit, data.imageplane, data.get_rms()) ** 2.0
+    )
     J = output.jac
     # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
     cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
@@ -62,73 +64,75 @@ def least_square(
     return Solution(outputs)
 
 
-def get_chi(
+def calculate_chi(
     params: list[float],
     model_func: Callable,
     intensity: np.ndarray,
-    intensity_err: np.ndarray,
+    intensity_error: np.ndarray,
     index: Optional[ArrayLike] = None,
 ) -> np.ndarray:
+    '''Calcurate chi = (data-model)/error for least square fitting
+    '''
     model = model_func(params)
     if index:
-        model[index] = model
-    chi = (intensity - model) / intensity_err
+        model = model[index]
+
+        # # Choose fitting region via indices.
+        # iv = (v - dv * c.conf.chan_start - vel_start) / dv
+        # iv = np.round(iv).astype(int)
+        # ix = (x - xlow).astype(int)
+        # iy = (y - ylow).astype(int)
+        # model_last = model[iy, ix, iv]
+
+    chi = (intensity - model) / intensity_error
+
     return chi
 
 
-def func_freeman_disk(params: list[float]):
-    '''Output Freeman disk.
-
-    Global parameters
-    ------------------
-    data, xx_grid, yy_grid, vv_grid, pfs, gl
+def create_model_convolved(params: list[float]):
+    '''Create a model detacube convolved with dirtybeam.
     '''
-    p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = params
+    model = create_model_at_imageplane(params)
 
-    # velocity field
-    pos_grid = np.array([xx_grid - p0, yy_grid - p1]).transpose(1, 2, 3, 0)
-    pos_grid = gl.lenz_image2source(pos_grid)
-    pos_grid = rotate_coord(pos_grid, -p2)
-    xx, yy = pos_grid.transpose(3, 0, 1, 2)
-    yy = yy / np.cos(p3)  # inclination
-    rr, pphi = polar_coord(xx, yy)
-    r2h = 0.5 * rr / p4
-    myu_0 = p6 / (2 * np.pi * p4 ** 2)
-    G = 1
-    A = sps.iv(0, r2h) * sps.kv(0, r2h) - sps.iv(1, r2h) * sps.kv(1, r2h)
-    f_sightline = np.cos(pphi) * np.sin(p3)
-    velocity = p5 + np.sqrt(4 * np.pi * G * myu_0 * p4 * r2h ** 2 * A) * f_sightline
-
-    # spatial intensity distribution
-    pos_grid = np.ndarray([xx_grid - p10, yy_grid - p11]).transpose(1, 2, 3, 0)
-    pos_grid = gl.lenz_image2source(pos_grid)
-    pos_grid = rotate_coord(pos_grid, -p12)
-    xx_f, yy_f = pos_grid.transpose(3, 0, 1, 2)
-    yy_f = yy_f / np.cos(p13)
-    rr_f, _ = polar_coord(xx_f, yy_f)
-    intensity = p7 * np.exp(-rr_f / p9)
-
-    # convolvolution
-    model = func_Gauss(vv_grid, center=velocity, sigma=p8, area=intensity)
     model_convolved = np.zeros(xx_grid.shape)
     for i in range(xx_grid.shape[2]):
-        model_convolved[:, :, i] = pfs.convolve(model[:, :, i])
-
-    # # Choose fitting region via indices.
-    # iv = (v - dv * c.conf.chan_start - vel_start) / dv
-    # iv = np.round(iv).astype(int)
-    # ix = (x - xlow).astype(int)
-    # iy = (y - ylow).astype(int)
-    # Imodel_last = model[iy, ix, iv]
+        model_convolved[:, :, i] = convolve(model[:, :, i])
 
     return model_convolved
 
 
-def func_Gauss(x, center, sigma, area):
-    '''Gaussian function.
+def create_model_at_imageplane(params: list[float]):
+    '''Create a model detacube on image plane using parameters and the grav. lenzing.
     '''
-    norm = area / (np.sqrt(2 * np.pi) * sigma)
-    return norm * np.exp(-((x - center) ** 2) / (2.0 * sigma ** 2))
+    p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = params
+
+    # velocity field
+    coord_image_v = np.array([xx_grid - p0, yy_grid - p1]).transpose(1, 2, 3, 0)
+    rr, pphi = to_objectcoord_from(coord_image_v, PA=p2, incl=p3)
+    velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=p6, rnorm=p4, incl=p3)
+
+    # spatial intensity distribution
+    coord_image_i = np.array([xx_grid - p10, yy_grid - p11]).transpose(1, 2, 3, 0)
+    rr_i, _ = to_objectcoord_from(coord_image_i, PA=p12, incl=p13)
+    intensity = func.reciprocal_exp(rr_i, norm=p7, rnorm=p9)
+
+    # create cube
+    model = func.gaussian(vv_grid, center=velocity, sigma=p8, area=intensity)
+    return model
+
+
+def to_objectcoord_from(coord_image, PA, incl):
+    '''Convert coordinates from imageplane to object polar coordinates.
+    '''
+    pa = PA
+    inclination = incl
+
+    coord_source = lenzing(coord_image)
+    coord_object = rotate_coord(coord_source, pa)
+    xx, yy = coord_object.transpose(3, 0, 1, 2)
+    yy = yy / np.cos(inclination)
+    r, phi = polar_coord(xx, yy)
+    return r, phi
 
 
 class Solution:

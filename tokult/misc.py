@@ -10,14 +10,26 @@ def rotate_coord(pos: np.ndarray, angle: float) -> np.ndarray:
     pos -- position array. shape: (n, m, 2)
     angle -- scalar; angle to rotate. radian
     '''
-    rot = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    rot = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
     _pos = pos[..., np.newaxis]
     return np.squeeze(rot @ _pos)
 
 
-def polar_coord(x, y):
+def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     '''Convert (x, y) to polar coordinates (r, phi)
     '''
     r = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
     return r, phi
+
+
+def no_lenzing(coordinate: np.ndarray) -> np.ndarray:
+    '''Dummy function. Return coordinate as itself without lenzing.
+    '''
+    return coordinate
+
+
+def no_convolve(datacube: np.ndarray) -> np.ndarray:
+    '''Dummy function. Return the datacube as itself without convolution.
+    '''
+    return datacube
