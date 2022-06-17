@@ -5,7 +5,8 @@ import numpy as np
 from scipy.signal import convolve2d
 from astropy.io import fits
 from astropy import wcs
-from typing import Sequence, Optional, Union, Callable
+from typing import Sequence, Optional, Union
+from numpy.typing import ArrayLike
 from . import common as c
 from . import fitting
 
@@ -21,18 +22,19 @@ class Tokult:
         self,
         datacube: DataCube,
         dirtybeam: Optional[DirtyBeam] = None,
-        gravlenz: Optional[GravLenz] = None,
+        gravlens: Optional[GravLens] = None,
     ) -> None:
         self.datacube = datacube
         self.dirtybeam = dirtybeam
-        self.gravlenz = gravlenz
+        self.gravlens = gravlens
+        self.modelcube: Optional[ModelCube] = None
 
     @classmethod
     def launch(
         cls,
         data: Union[np.ndarray, str],
         beam: Union[np.ndarray, str, None] = None,
-        gravlenz: Union[
+        gravlens: Union[
             tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str], None
         ] = None,
         header_data: Optional[fits.Header] = None,
@@ -54,26 +56,44 @@ class Tokult:
         else:
             dirtybeam = None
 
-        gl: Optional[GravLenz]
-        if gravlenz is not None:
-            g1, g2, k = gravlenz
-            gl = GravLenz.create(g1, g2, k, header=header_gamma, index_hdul=index_gamma)
+        gl: Optional[GravLens]
+        if gravlens is not None:
+            g1, g2, k = gravlens
+            gl = GravLens.create(g1, g2, k, header=header_gamma, index_hdul=index_gamma)
         else:
             gl = None
         return cls(datacube, dirtybeam, gl)
 
-    def image_fit(
-        self, init: Sequence[float], bound: Sequence[float], func_fit: Callable
+    def imagefit(
+        self, init: Sequence[float], bound: Optional[ArrayLike] = None, niter: int = 1
     ):
         '''First main function to fit 3d model to data cube on image plane.
         '''
-        sol = fitting.least_square(self.datacube, init, bound, func_fit)
-        return sol
+        func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
+        func_lensing = self.gravlens.lensing if self.gravlens else None
 
-    def uv_fit(self):
+        solution = fitting.least_square(
+            self.datacube,
+            init,
+            bound,
+            func_convolve=func_convolve,
+            func_lensing=func_lensing,
+            niter=niter,
+        )
+        self.construct_modelcube(solution.best)
+        return solution
+
+    def uvfit(self):
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
         pass
+
+    def initialguess(self) -> fitting.InputParams:
+        '''Guess initial input parameters for fitting.
+        '''
+        func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
+        func_lensing = self.gravlens.lensing if self.gravlens else None
+        return fitting.initialguess(self.datacube, func_convolve, func_lensing)
 
     def set_region(
         self,
@@ -86,8 +106,8 @@ class Tokult:
         self.datacube.cutout(xlim, ylim, vlim)
         if self.dirtybeam is not None:
             self.dirtybeam.cutout_to_match_with(self.datacube)
-        if self.gravlenz is not None:
-            self.gravlenz.match_wcs_with(self.datacube)
+        if self.gravlens is not None:
+            self.gravlens.match_wcs_with(self.datacube)
 
     def set_datacube(
         self,
@@ -117,7 +137,7 @@ class Tokult:
             data_or_fname, header=header, index_hdul=index_hdul
         )
 
-    def set_gravlenz(
+    def set_gravlens(
         self,
         data_or_fname: Union[
             tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str]
@@ -125,10 +145,19 @@ class Tokult:
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
-        '''Set gravitational lenzing data into GravLenz class.
+        '''Set gravitational lensing data into GravLens class.
         '''
         g1, g2, k = data_or_fname
-        self.gravlenz = GravLenz.create(g1, g2, k, header=header, index_hdul=index_hdul)
+        self.gravlens = GravLens.create(g1, g2, k, header=header, index_hdul=index_hdul)
+
+    def construct_modelcube(self, params):
+        '''Construct model cube using parameters.
+        '''
+        datacube = self.datacube
+        func_lensing = self.gravlens.lensing if self.gravlens else None
+        func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
+        fitting.initialize_globalparameters(datacube, func_convolve, func_lensing)
+        self.modelcube = ModelCube.create(params, self.datacube.original)
 
 
 class Cube:
@@ -136,7 +165,12 @@ class Cube:
     '''
 
     def __init__(
-        self, imageplane: np.ndarray, header: Optional[fits.Header] = None,
+        self,
+        imageplane: np.ndarray,
+        header: Optional[fits.Header] = None,
+        xlim: Optional[tuple[int, int]] = None,
+        ylim: Optional[tuple[int, int]] = None,
+        vlim: Optional[tuple[int, int]] = None,
     ) -> None:
         self.original = imageplane
         self.imageplane = imageplane
@@ -149,7 +183,7 @@ class Cube:
         self.xgrid: np.ndarray
         self.ygrid: np.ndarray
         self.coord_imageplane: list[np.ndarray]
-        self.cutout()
+        self.cutout(xlim, ylim, vlim)
 
     def cutout(
         self,
@@ -159,9 +193,9 @@ class Cube:
     ) -> None:
         '''Create coordinates of data cube.
         '''
-        self.xlim = xlim if xlim else (0, self.imageplane.shape[2])
-        self.ylim = ylim if ylim else (0, self.imageplane.shape[1])
-        self.vlim = vlim if vlim else (0, self.imageplane.shape[0])
+        self.xlim = xlim if xlim else (0, self.original.shape[2])
+        self.ylim = ylim if ylim else (0, self.original.shape[1])
+        self.vlim = vlim if vlim else (0, self.original.shape[0])
         self.xslice = slice(*self.xlim)
         self.yslice = slice(*self.ylim)
         self.vslice = slice(*self.vlim)
@@ -170,23 +204,31 @@ class Cube:
         yarray = np.arange(self.ylim[0], self.ylim[1])
         varray = np.arange(self.vlim[0], self.vlim[1])
         self.coord_imageplane = np.meshgrid(varray, yarray, xarray, indexing='ij')
-        self.vgrid, self.xgrid, self.ygrid = self.coord_imageplane
+        self.vgrid, self.ygrid, self.xgrid = self.coord_imageplane
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
 
-    def get_rms(self):
+    def rms(self):
         '''Return rms noise of the datacube.
         '''
-        try:
-            return self.rms
-
-        except AttributeError:
-            # FIXME: Write code to compute rms as a function of frequency.
-            return self.rms
+        maskedimage = np.copy(self.original[self.vslice, :, :])
+        maskedimage[:, self.yslice, self.xslice] = None
+        sumsq = np.nansum(maskedimage ** 2, axis=(1, 2))
+        n = np.count_nonzero(maskedimage, axis=(1, 2))
+        return np.sqrt(sumsq / n)
 
     def moment0(self) -> np.ndarray:
         '''Return moment 0 maps using pixel indicies.
         '''
         return np.sum(self.imageplane, axis=0)
+
+    def rms_moment0(self):
+        '''Return rms noise of the moment 0 map.
+        '''
+        maskedimage = self.moment0()
+        maskedimage[self.yslice, self.xslice] = None
+        sumsq = np.nansum(maskedimage ** 2)
+        n = np.count_nonzero(maskedimage)
+        return np.sqrt(sumsq / n)
 
     def pixmoment1(self, thresh: float = 0.0) -> np.ndarray:
         '''Return moment 1 maps using pixel indicies.
@@ -300,7 +342,19 @@ class ModelCube(Cube):
     '''Cube class to contain a modeled datacube.
     '''
 
-    pass
+    @classmethod
+    def create(cls, params: list[float], original_image: np.ndarray) -> ModelCube:
+        '''Constructer.
+        '''
+        imageplane = fitting.construct_model_convolved(params)
+        xlim = (fitting.xx_grid.min(), fitting.xx_grid.max() + 1)
+        ylim = (fitting.yy_grid.min(), fitting.yy_grid.max() + 1)
+        vlim = (fitting.vv_grid.min(), fitting.vv_grid.max() + 1)
+        original_mock = np.zeros_like(original_image)
+        original_mock[
+            vlim[0] : vlim[1], ylim[0] : ylim[1], xlim[0] : xlim[1]
+        ] = imageplane
+        return cls(original_mock, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:
@@ -335,7 +389,7 @@ class DirtyBeam:
         c.logger.error(message)
         raise TypeError(message)
 
-    def convolve(self, image: np.ndarray) -> np.ndarray:
+    def convolve(self, image: np.ndarray, index=0) -> np.ndarray:
         '''Convolve image with dirtybeam (psf).
         '''
         # s1 = np.arange(c.conf.kernel_num)
@@ -346,7 +400,8 @@ class DirtyBeam:
         # st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
         # kernel = self.beam[st]
         # kernel2 = kernel / np.sum(kernel)
-        kernel = self.beam / np.sum(self.beam)
+        beam = self.beam[index, :, :]
+        kernel = beam / np.sum(beam)
         return convolve2d(image, kernel, mode='same')
 
     def cutout(
@@ -385,10 +440,10 @@ class DirtyBeam:
         return np.squeeze(beam), header
 
 
-class GravLenz:
-    '''Contains gravitational lenzing used for Cube.
+class GravLens:
+    '''Contains gravitational lensing used for Cube.
 
-    Contents are lenzing parameters depending on positions: gamma1, gamma2, and kappa.
+    Contents are lensing parameters depending on positions: gamma1, gamma2, and kappa.
     '''
 
     def __init__(
@@ -414,7 +469,7 @@ class GravLenz:
         data_or_fname_kappa: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
-    ) -> GravLenz:
+    ) -> GravLens:
         '''Constructer
         '''
         if not (
@@ -455,10 +510,10 @@ class GravLenz:
         c.logger.error(message)
         raise TypeError(message)
 
-    def lenzing(self, coordinates: np.ndarray) -> np.ndarray:
+    def lensing(self, coordinates: np.ndarray) -> np.ndarray:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
-        This method use gravitational lenzing parameters: gamma1, gamma2, and kappa.
+        This method use gravitational lensing parameters: gamma1, gamma2, and kappa.
         coordinates -- position array including (x, y).
                        shape: (n, m, 2) and shape of x: (n, m)
         '''
@@ -492,7 +547,7 @@ class GravLenz:
     def loadfits(
         fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
-        '''Read gravlenz from fits file.
+        '''Read gravlens from fits file.
         '''
         with fits.open(fname_gamma1) as hdul:
             gamma1 = hdul[index_hdul].data

@@ -3,7 +3,7 @@
 execfile('casa.py')
 c.initialize_tokult()
 c.fnames.readconfig_casa()
-c.fnames.readconfig_gravlenz()
+c.fnames.readconfig_gravlens()
 
 conduct_listobs()
 conduct_split()
@@ -18,7 +18,7 @@ fitgauss_spaxels()
 write_mom0datatxt()
 write_datacubetxt()
 write_beamtxt()
-write_gravlenz()
+write_gravlens()
 
 param_m = fitting_mom0()
 param_v = fitting_velocity2d(param_m)

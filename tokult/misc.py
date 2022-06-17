@@ -23,13 +23,13 @@ def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return r, phi
 
 
-def no_lenzing(coordinate: np.ndarray) -> np.ndarray:
-    '''Dummy function. Return coordinate as itself without lenzing.
+def no_lensing(coordinate: np.ndarray) -> np.ndarray:
+    '''Dummy function. Return coordinate as itself without lensing.
     '''
     return coordinate
 
 
-def no_convolve(datacube: np.ndarray) -> np.ndarray:
+def no_convolve(datacube: np.ndarray, index: int = 0) -> np.ndarray:
     '''Dummy function. Return the datacube as itself without convolution.
     '''
     return datacube
