@@ -7,7 +7,7 @@ from typing import Callable, Sequence, Optional, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
 from . import function as func
-from .misc import rotate_coord, polar_coord, no_lensing, no_convolve
+from .misc import rotate_coord, polar_coord, no_lensing, no_convolve, fft2
 
 if TYPE_CHECKING:
     from .core import DataCube
@@ -23,11 +23,14 @@ convolve: a function to convolve the input datacube. Method of DirtyBeam.
 lensing: a function to convert source plane to image plane. Method of GravLens.
 '''
 
-imagecube: np.ndarray
-imagecube_error: np.ndarray
+cube: np.ndarray
+cube_error: np.ndarray
+beam_visibility: np.ndarray
 xx_grid: np.ndarray
 yy_grid: np.ndarray
 vv_grid: np.ndarray
+xslice: slice
+yslice: slice
 lensing: Callable = no_lensing
 convolve: Callable = no_convolve
 
@@ -38,19 +41,31 @@ def least_square(
     bound: Optional[ArrayLike] = None,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    beam_vis: Optional[np.ndarray] = None,
     mask_use: Optional[ArrayLike] = None,
     niter: int = 1,
+    mode_fit: str = 'image',
 ) -> Solution:
     '''Least square fitting using scipy.optimize.least_squares
     '''
-    initialize_globalparameters(datacube, func_convolve, func_lensing)
-    func_fit = construct_model_convolved
-    bound = get_bound_params() if bound is None else bound
+    if mode_fit == 'image':
+        initialize_globalparameters_for_image(datacube, func_convolve, func_lensing)
+        func_fit = construct_convolvedmodel
+    elif mode_fit == 'uv':
+        if beam_vis is None:
+            raise ValueError('"beam_vis" is necessarily for uvfit')
+        initialize_globalparameters_for_uv(datacube, beam_vis, func_lensing)
+        func_fit = construct_uvmodel
+    else:
+        raise ValueError(f'mode_fit is "image" or "uv", no option for "{mode_fit}".')
 
+    bound = get_bound_params() if bound is None else bound
     args = (func_fit, mask_use)
+
+    _init = np.copy(init)
     for _ in range(niter):
-        output = sp_least_squares(calculate_chi, init, args=args, bounds=bound)
-        init = output.x
+        output = sp_least_squares(calculate_chi, _init, args=args, bounds=bound)
+        _init = output.x
 
     p_bestfit = output.x
     dof = datacube.imageplane.size - 1 - len(init)
@@ -78,19 +93,29 @@ def calculate_chi(
         # iy = (y - ylow).astype(int)
         # model_last = model[iy, ix, iv]
 
-    chi = (imagecube - model) / imagecube_error
+    chi = abs(cube - model) / cube_error
     return chi.ravel()
 
 
-def construct_model_convolved(params: list[float]) -> np.ndarray:
+def construct_convolvedmodel(params: list[float]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
     model = construct_model_at_imageplane(params)
     model_convolved = np.empty_like(model)
     for i, image in enumerate(model):
         model_convolved[i, :, :] = convolve(image, index=i)
-
     return model_convolved
+
+
+def construct_uvmodel(params: list[float]) -> np.ndarray:
+    '''Construct a model detacube convolved with dirtybeam.
+    '''
+    global cube, yslice, xslice, beam_visibility
+    model_cutout = construct_model_at_imageplane(params)
+    model_image = np.zeros_like(cube)
+    model_image[:, yslice, xslice] = model_cutout
+    model_visibility = fft2(model_image)
+    return model_visibility * beam_visibility
 
 
 def construct_model_at_imageplane(params: list[float]) -> np.ndarray:
@@ -234,24 +259,50 @@ def get_bound_params(
     return (_bound(lower), _bound(upper))
 
 
-def initialize_globalparameters(
+def initialize_globalparameters_for_image(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    beam_vis: Optional[np.ndarray] = None,
 ) -> None:
-    '''Set global parameters used in fitting.py.
+    '''Set global parameters used in fitting.py in the image plane.
     '''
-    global imagecube, imagecube_error, xx_grid, yy_grid, vv_grid, lensing, convolve
+    global cube, cube_error, xx_grid, yy_grid, vv_grid
+    global lensing, convolve
 
-    imagecube = np.copy(datacube.imageplane)
-    imagecube_error = datacube.rms()
-    imagecube_error = imagecube_error[:, np.newaxis, np.newaxis]
+    cube = np.copy(datacube.imageplane)
+    cube_error = datacube.rms()
+    cube_error = cube_error[:, np.newaxis, np.newaxis]
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = no_convolve
     f_no_lensing: Callable = no_lensing
     convolve = func_convolve if func_convolve else f_no_convolve
+    lensing = func_lensing if func_lensing else f_no_lensing
+
+
+def initialize_globalparameters_for_uv(
+    datacube: DataCube, beam_vis: np.ndarray, func_lensing: Optional[Callable] = None,
+) -> None:
+    '''Set global parameters used in fitting.py in the uv plane.
+    '''
+    global cube, cube_error, xx_grid, yy_grid, vv_grid, xslice, yslice
+    global lensing, beam_visibility
+
+    cube = np.copy(datacube.uvplane)
+    cube_error = np.array(1.0)
+    # shape_data = datacube.uvplane.shape
+    # xarray = np.arange(0, shape_data[2])
+    # yarray = np.arange(0, shape_data[1])
+    # varray = np.arange(datacube.vlim[0], datacube.vlim[1])
+    # vv_grid, yy_grid, xx_grid = np.meshgrid(varray, yarray, xarray, indexing='ij')
+    vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
+    xslice, yslice = (datacube.xslice, datacube.yslice)
+    beam_visibility = beam_vis
+
+    # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
+    f_no_lensing: Callable = no_lensing
     lensing = func_lensing if func_lensing else f_no_lensing
 
 
@@ -298,7 +349,7 @@ def least_square_moment0(
 
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
-    initialize_globalparameters_moment(datacube, func_convolve, func_lensing, mom=0)
+    initialize_globalparameters_for_moment(datacube, func_convolve, func_lensing, mom=0)
     func_fit = construct_model_moment0
 
     x0, y0 = datacube.xgrid.mean(), datacube.ygrid.mean()
@@ -322,7 +373,7 @@ def least_square_moment1(
 
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
-    initialize_globalparameters_moment(datacube, func_convolve, func_lensing, mom=1)
+    initialize_globalparameters_for_moment(datacube, func_convolve, func_lensing, mom=1)
     func_fit = construct_model_moment1
 
     bound = (
@@ -331,15 +382,15 @@ def least_square_moment1(
     )
 
     rms = datacube.rms_moment0()
-    imagecube = datacube.pixmoment1(thresh=3 * rms)
-    mask = np.isfinite(imagecube)
+    moment1 = datacube.pixmoment1(thresh=3 * rms)
+    mask = np.isfinite(moment1)
 
     args = (func_fit, mask)
     output = sp_least_squares(calculate_chi, init, args=args, bounds=bound)
     return output.x
 
 
-def initialize_globalparameters_moment(
+def initialize_globalparameters_for_moment(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
@@ -347,18 +398,18 @@ def initialize_globalparameters_moment(
 ) -> None:
     '''Set global parameters used in fitting.py.
     '''
-    global imagecube, imagecube_error, xx_grid, yy_grid, lensing, convolve
+    global cube, cube_error, xx_grid, yy_grid, lensing, convolve
 
     if mom == 0:
-        imagecube = datacube.moment0()
-        imagecube_error = datacube.rms_moment0()
+        cube = datacube.moment0()
+        cube_error = datacube.rms_moment0()
     elif mom == 1:
         rms = datacube.rms_moment0()
-        imagecube = datacube.pixmoment1(thresh=3 * rms)
-        idx = np.isfinite(imagecube)
-        imagecube = imagecube[idx]  # imagecube becomes 1d
+        cube = datacube.pixmoment1(thresh=3 * rms)
+        idx = np.isfinite(cube)
+        cube = cube[idx]  # cube becomes 1d
         mom0 = datacube.moment0()[idx]
-        imagecube_error = 1 / np.sqrt(mom0)
+        cube_error = 1 / np.sqrt(mom0)
     _, yy_grid, xx_grid = datacube.coord_imageplane
     xx_grid = xx_grid[0, :, :]
     yy_grid = yy_grid[0, :, :]

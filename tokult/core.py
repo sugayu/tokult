@@ -9,6 +9,7 @@ from typing import Sequence, Optional, Union
 from numpy.typing import ArrayLike
 from . import common as c
 from . import fitting
+from .misc import fft2
 
 
 ##
@@ -66,7 +67,7 @@ class Tokult:
 
     def imagefit(
         self, init: Sequence[float], bound: Optional[ArrayLike] = None, niter: int = 1
-    ):
+    ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
@@ -79,14 +80,34 @@ class Tokult:
             func_convolve=func_convolve,
             func_lensing=func_lensing,
             niter=niter,
+            mode_fit='image',
         )
         self.construct_modelcube(solution.best)
         return solution
 
-    def uvfit(self):
+    def uvfit(
+        self, init: Sequence[float], bound: Optional[ArrayLike] = None,
+    ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
-        pass
+        if self.dirtybeam:
+            beam_visibility = self.dirtybeam.uvplane
+        else:
+            msg = '"DirtyBeam" is necessarily for uvfit.'
+            c.logger.warning(msg)
+            raise ValueError(msg)
+        func_lensing = self.gravlens.lensing if self.gravlens else None
+
+        solution = fitting.least_square(
+            self.datacube,
+            init,
+            bound,
+            beam_vis=beam_visibility,
+            func_lensing=func_lensing,
+            mode_fit='uv',
+        )
+        self.construct_modelcube(solution.best)
+        return solution
 
     def initialguess(self) -> fitting.InputParams:
         '''Guess initial input parameters for fitting.
@@ -156,7 +177,9 @@ class Tokult:
         datacube = self.datacube
         func_lensing = self.gravlens.lensing if self.gravlens else None
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
-        fitting.initialize_globalparameters(datacube, func_convolve, func_lensing)
+        fitting.initialize_globalparameters_for_image(
+            datacube, func_convolve, func_lensing
+        )
         self.modelcube = ModelCube.create(params, self.datacube.original)
 
 
@@ -175,6 +198,7 @@ class Cube:
         self.original = imageplane
         self.imageplane = imageplane
         self.header = header
+        self.uvplane = self.fft2(self.original, zero_padding=True)
 
         self.xlim: tuple[int, int]
         self.ylim: tuple[int, int]
@@ -206,6 +230,7 @@ class Cube:
         self.coord_imageplane = np.meshgrid(varray, yarray, xarray, indexing='ij')
         self.vgrid, self.ygrid, self.xgrid = self.coord_imageplane
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
+        self.uvplane = self.fft2(self.original[self.vslice, :, :], zero_padding=True)
 
     def rms(self):
         '''Return rms noise of the datacube.
@@ -301,6 +326,19 @@ class Cube:
         c.logger.error(message)
         raise ValueError(message)
 
+    @staticmethod
+    def fft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
+        '''Wrapper of misc.fft2.
+        '''
+        if np.any(idx := (np.logical_not(np.isfinite(data)))):
+            if zero_padding:
+                data[idx] = 0.0
+            else:
+                raise ValueError(
+                    'Input cube data includes non-finite values (NaN or Inf).'
+                )
+        return fft2(data)
+
 
 class DataCube(Cube):
     '''Cube class to contain an observed datacube.
@@ -346,7 +384,7 @@ class ModelCube(Cube):
     def create(cls, params: list[float], original_image: np.ndarray) -> ModelCube:
         '''Constructer.
         '''
-        imageplane = fitting.construct_model_convolved(params)
+        imageplane = fitting.construct_convolvedmodel(params)
         xlim = (fitting.xx_grid.min(), fitting.xx_grid.max() + 1)
         ylim = (fitting.yy_grid.min(), fitting.yy_grid.max() + 1)
         vlim = (fitting.vv_grid.min(), fitting.vv_grid.max() + 1)
@@ -365,8 +403,9 @@ class DirtyBeam:
 
     def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
         self.original = beam
-        self.beam = beam
+        self.imageplane = beam
         self.header = header
+        self.uvplane = fft2(self.original)
 
     @classmethod
     def create(
@@ -400,8 +439,10 @@ class DirtyBeam:
         # st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
         # kernel = self.beam[st]
         # kernel2 = kernel / np.sum(kernel)
-        beam = self.beam[index, :, :]
+        beam = self.imageplane[index, :, :]
         kernel = beam / np.sum(beam)
+
+        # todo: should be changed to fftconvolve
         return convolve2d(image, kernel, mode='same')
 
     def cutout(
@@ -415,7 +456,8 @@ class DirtyBeam:
         xslice = slice(*xlim) if isinstance(xlim, tuple) else xlim
         yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
         vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
-        self.beam = self.original[vslice, yslice, xslice]
+        self.imageplane = self.original[vslice, yslice, xslice]
+        self.uvplane = fft2(self.original[vslice, :, :])
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a cubic region from the dirty beam map.

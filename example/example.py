@@ -1,5 +1,9 @@
 from tokult.core import Tokult
-from tokult.fitting import get_bound_params, initialize_globalparameters, InputParams
+from tokult.fitting import (
+    get_bound_params,
+    initialize_globalparameters_for_image,
+    InputParams,
+)
 
 tok = Tokult.launch(
     'cube_dirty.fits',
@@ -8,9 +12,13 @@ tok = Tokult.launch(
 )
 tok.set_region((226, 286), (226, 286), (5, 12))
 
+# init = tok.initialguess()
+# bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265))
+# sol = tok.imagefit(init=init, bound=bound, niter=8)
+
 init = tok.initialguess()
 bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265))
-sol = tok.imagefit(init=init, bound=bound, niter=8)
+sol = tok.uvfit(init=init, bound=bound)
 
 # init2 = InputParams(
 #     x0_dyn=257.2535169953845,
