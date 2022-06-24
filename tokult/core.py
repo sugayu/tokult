@@ -5,7 +5,7 @@ import numpy as np
 from scipy.signal import convolve2d
 from astropy.io import fits
 from astropy import wcs
-from typing import Sequence, Optional, Union
+from typing import Callable, Sequence, Optional, Union
 from numpy.typing import ArrayLike
 from . import common as c
 from . import fitting
@@ -66,7 +66,12 @@ class Tokult:
         return cls(datacube, dirtybeam, gl)
 
     def imagefit(
-        self, init: Sequence[float], bound: Optional[ArrayLike] = None, niter: int = 1
+        self,
+        init: Sequence[float],
+        bound: Optional[ArrayLike] = None,
+        niter: int = 1,
+        fix: Optional[fitting.FixParams] = None,
+        is_separate: bool = False,
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
@@ -81,12 +86,18 @@ class Tokult:
             func_lensing=func_lensing,
             niter=niter,
             mode_fit='image',
+            fix=fix,
+            is_separate=is_separate,
         )
         self.construct_modelcube(solution.best)
         return solution
 
     def uvfit(
-        self, init: Sequence[float], bound: Optional[ArrayLike] = None,
+        self,
+        init: Sequence[float],
+        bound: Optional[ArrayLike] = None,
+        fix: Optional[fitting.FixParams] = None,
+        is_separate: bool = False,
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
@@ -105,6 +116,8 @@ class Tokult:
             beam_vis=beam_visibility,
             func_lensing=func_lensing,
             mode_fit='uv',
+            fix=fix,
+            is_separate=is_separate,
         )
         self.construct_modelcube(solution.best)
         return solution
@@ -171,16 +184,18 @@ class Tokult:
         g1, g2, k = data_or_fname
         self.gravlens = GravLens.create(g1, g2, k, header=header, index_hdul=index_hdul)
 
-    def construct_modelcube(self, params):
+    def construct_modelcube(self, params: tuple[float, ...]) -> None:
         '''Construct model cube using parameters.
         '''
         datacube = self.datacube
         func_lensing = self.gravlens.lensing if self.gravlens else None
-        func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
-        fitting.initialize_globalparameters_for_image(
-            datacube, func_convolve, func_lensing
+        func_convolve = self.dirtybeam.fullconvolve if self.dirtybeam else None
+        # fitting.initialize_globalparameters_for_image(
+        #     datacube, func_convolve, func_lensing
+        # )
+        self.modelcube = ModelCube.create(
+            params, datacube=datacube, convolve=func_convolve, lensing=func_lensing
         )
-        self.modelcube = ModelCube.create(params, self.datacube.original)
 
 
 class Cube:
@@ -381,18 +396,36 @@ class ModelCube(Cube):
     '''
 
     @classmethod
-    def create(cls, params: list[float], original_image: np.ndarray) -> ModelCube:
+    def create(
+        cls,
+        params: tuple[float, ...],
+        datacube: DataCube,
+        lensing: Optional[Callable] = None,
+        convolve: Optional[Callable] = None,
+    ) -> ModelCube:
         '''Constructer.
         '''
-        imageplane = fitting.construct_convolvedmodel(params)
-        xlim = (fitting.xx_grid.min(), fitting.xx_grid.max() + 1)
-        ylim = (fitting.yy_grid.min(), fitting.yy_grid.max() + 1)
-        vlim = (fitting.vv_grid.min(), fitting.vv_grid.max() + 1)
-        original_mock = np.zeros_like(original_image)
-        original_mock[
-            vlim[0] : vlim[1], ylim[0] : ylim[1], xlim[0] : xlim[1]
-        ] = imageplane
-        return cls(original_mock, xlim=xlim, ylim=ylim, vlim=vlim)
+        # shape = datacube.original.shape
+        # x, y, v = (np.arange(shape[2]), np.arange(shape[1]), np.arange(shape[0]))
+        # vv_grid, yy_grid, xx_grid = np.meshgrid(v, y, x)
+        imagecube = fitting.construct_model_at_imageplane_with(
+            params,
+            xx_grid=datacube.xgrid,
+            yy_grid=datacube.ygrid,
+            vv_grid=datacube.vgrid,
+            lensing=lensing,
+        )
+        modelcube = np.zeros_like(datacube.original)
+        xs, ys, vs = datacube.xslice, datacube.yslice, datacube.vslice
+        modelcube[vs, ys, xs] = imagecube
+
+        if convolve is not None:
+            model_convolved = np.empty_like(modelcube)
+            for i, image in enumerate(modelcube):
+                model_convolved[i, :, :] = convolve(image, index=i)
+
+        xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
+        return cls(model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:
@@ -439,9 +472,16 @@ class DirtyBeam:
         # st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
         # kernel = self.beam[st]
         # kernel2 = kernel / np.sum(kernel)
-        beam = self.imageplane[index, :, :]
-        kernel = beam / np.sum(beam)
+        kernel = self.imageplane[index, :, :]
+        # kernel = beam  / np.sum(beam)
 
+        # todo: should be changed to fftconvolve
+        return convolve2d(image, kernel, mode='same')
+
+    def fullconvolve(self, image: np.ndarray, index=0) -> np.ndarray:
+        '''Convolve image with original-size dirtybeam (psf).
+        '''
+        kernel = self.original[index, :, :]
         # todo: should be changed to fftconvolve
         return convolve2d(image, kernel, mode='same')
 

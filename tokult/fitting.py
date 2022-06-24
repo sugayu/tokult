@@ -3,7 +3,7 @@
 from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares as sp_least_squares
-from typing import Callable, Sequence, Optional, TYPE_CHECKING
+from typing import Callable, Sequence, Optional, Union, Any, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
 from . import function as func
@@ -34,6 +34,11 @@ yslice: slice
 lensing: Callable = no_lensing
 convolve: Callable = no_convolve
 
+# To fix parameters in fitting
+parameters_preset: Optional[np.ndarray] = None
+index_preset: list[int]
+index_input: list[int]
+
 
 def least_square(
     datacube: DataCube,
@@ -45,6 +50,8 @@ def least_square(
     mask_use: Optional[ArrayLike] = None,
     niter: int = 1,
     mode_fit: str = 'image',
+    fix: Optional[FixParams] = None,
+    is_separate: bool = False,
 ) -> Solution:
     '''Least square fitting using scipy.optimize.least_squares
     '''
@@ -59,6 +66,7 @@ def least_square(
     else:
         raise ValueError(f'mode_fit is "image" or "uv", no option for "{mode_fit}".')
 
+    set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     args = (func_fit, mask_use)
 
@@ -78,7 +86,7 @@ def least_square(
 
 
 def calculate_chi(
-    params: list[float], model_func: Callable, index: Optional[ArrayLike] = None,
+    params: tuple[float, ...], model_func: Callable, index: Optional[ArrayLike] = None,
 ) -> np.ndarray:
     '''Calcurate chi = (data-model)/error for least square fitting
     '''
@@ -97,7 +105,7 @@ def calculate_chi(
     return chi.ravel()
 
 
-def construct_convolvedmodel(params: list[float]) -> np.ndarray:
+def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
     model = construct_model_at_imageplane(params)
@@ -107,7 +115,7 @@ def construct_convolvedmodel(params: list[float]) -> np.ndarray:
     return model_convolved
 
 
-def construct_uvmodel(params: list[float]) -> np.ndarray:
+def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
     global cube, yslice, xslice, beam_visibility
@@ -118,10 +126,11 @@ def construct_uvmodel(params: list[float]) -> np.ndarray:
     return model_visibility * beam_visibility
 
 
-def construct_model_at_imageplane(params: list[float]) -> np.ndarray:
+def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube on image plane using parameters and the grav. lensing.
     '''
-    p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = params
+    _params = reshape_pfix(params)
+    p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = _params
 
     # velocity field
     coord_image_v = np.moveaxis(np.array([xx_grid - p0, yy_grid - p1]), 0, -1)
@@ -138,7 +147,9 @@ def construct_model_at_imageplane(params: list[float]) -> np.ndarray:
     return model
 
 
-def to_objectcoord_from(coord_image, PA, incl):
+def to_objectcoord_from(
+    coord_image: np.ndarray, PA: float, incl: float
+) -> tuple[np.ndarray, np.ndarray]:
     '''Convert coordinates from imageplane to object polar coordinates.
     '''
     pa = PA
@@ -150,6 +161,36 @@ def to_objectcoord_from(coord_image, PA, incl):
     yy = yy / np.cos(inclination)
     r, phi = polar_coord(xx, yy)
     return r, phi
+
+
+def construct_model_at_imageplane_with(
+    params: tuple[float, ...],
+    xx_grid: np.ndarray,
+    yy_grid: np.ndarray,
+    vv_grid: np.ndarray,
+    lensing: Optional[Callable] = None,
+) -> np.ndarray:
+    '''Construct a model detacube convolved with dirtybeam.
+    '''
+    lensing = no_lensing if lensing is None else lensing
+    keys_globals = [
+        'xx_grid',
+        'yy_grid',
+        'vv_grid',
+        'lensing',
+    ]
+    _globals = {}
+
+    for k in keys_globals:
+        _globals[k] = globals()[k]
+        globals()[k] = locals()[k]
+
+    model = construct_model_at_imageplane(params)
+
+    for k in keys_globals:
+        globals()[k] = _globals[k]
+
+    return model
 
 
 def construct_model_moment0(params: list[float]) -> np.ndarray:
@@ -173,10 +214,10 @@ def construct_model_moment1(params: list[float]) -> np.ndarray:
     coord_image_v = np.moveaxis(np.array([xx_grid - p5, yy_grid - p6]), 0, -1)
     rr, pphi = to_objectcoord_from(coord_image_v, PA=p4, incl=p0)
     velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=p2, rnorm=p1, incl=p0)
-    # NOTE: convolving velocity is correct?
-    model = convolve(velocity, index=0)
+    # # NOTE: convolving velocity is correct?
+    # model = convolve(velocity, index=0)
 
-    return model
+    return velocity
 
 
 class Solution:
@@ -304,6 +345,91 @@ def initialize_globalparameters_for_uv(
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_lensing: Callable = no_lensing
     lensing = func_lensing if func_lensing else f_no_lensing
+
+
+class FixParams(NamedTuple):
+    '''Fixed parameters for construct_model_at_imageplane.
+    '''
+
+    x0_dyn: Optional[float] = None
+    y0_dyn: Optional[float] = None
+    PA_dyn: Optional[float] = None
+    incliation_dyn: Optional[float] = None
+    radius_dyn: Optional[float] = None
+    velocity_sys: Optional[float] = None
+    mass_dyn: Optional[float] = None
+    brightness_center: Optional[float] = None
+    velocity_dispersion: Optional[float] = None
+    radius_emi: Optional[Union[float, bool]] = None
+    x0_emi: Optional[Union[float, bool]] = None
+    y0_emi: Optional[Union[float, bool]] = None
+    PA_emi: Optional[Union[float, bool]] = None
+    inclination_emi: Optional[Union[float, bool]] = None
+
+
+def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
+    '''Set global parameters related with fixed parameters.
+
+    if a value in fix is:
+    - None: the parameter is not fixed
+    - float: the perameter is fixed to the float value
+    - True: the parameter has the same value as another parameter
+    '''
+    global parameters_preset, index_preset, index_input
+    parameters_preset = np.empty(14)
+    index_preset = []
+    index_input = []
+
+    parameters_share = FixParams(
+        radius_emi=4, x0_emi=0, y0_emi=1, PA_emi=2, inclination_emi=3
+    )
+    free_parameter = None
+    fixed_to_another_parameter = True
+
+    if (fix is None) and (is_separate):
+        parameters_preset = None
+
+    elif (fix is None) and (not is_separate):
+        for i, value in enumerate(parameters_share):
+            if value is not None:
+                index_preset.append(i)
+                index_input.append(int(value))
+
+    elif fix is not None:
+        for i, p in enumerate(fix):
+            p_is_emi_component = isinstance(parameters_share[i], float)
+            if is_separate and p_is_emi_component:
+                p = True
+
+            p_is_fixed_to_a_value = isinstance(p, float)
+
+            if p_is_fixed_to_a_value:
+                # the perameter is fixed to the float value
+                parameters_preset[i] = p
+
+            if p is free_parameter:
+                index_preset.append(i)
+                index_input.append(i)
+
+            if p is fixed_to_another_parameter:
+                if (idx := parameters_share[i]) is None:
+                    raise TypeError(
+                        f'An unsupported parameter p[{i}] is set to True in FixParams.'
+                    )
+                index_preset.append(i)
+                index_input.append(int(idx))
+
+
+def reshape_pfix(params: tuple[float, ...]) -> tuple[Any, ...]:
+    '''Set fixed parameters with pfix by inserting parameters into params.
+    - params -- parameter array. Its length is shorter than 14, which is the
+                total number of parameters.
+    '''
+    global parameters_preset, index_preset, index_input
+    if parameters_preset is None:
+        return params
+    parameters_preset[index_preset] = np.array(params)[index_input]
+    return tuple(parameters_preset)
 
 
 def initialguess(

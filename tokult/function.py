@@ -23,7 +23,7 @@ def reciprocal_exp(r: np.ndarray, norm: float, rnorm: float) -> np.ndarray:
 
 
 def freeman_disk(
-    r: np.ndarray, phi: float, mass_dyn: float, rnorm: float, incl: float
+    r: np.ndarray, phi: np.ndarray, mass_dyn: float, rnorm: float, incl: float
 ) -> np.ndarray:
     '''Freeman disk function
     '''

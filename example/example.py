@@ -4,6 +4,7 @@ from tokult.fitting import (
     initialize_globalparameters_for_image,
     InputParams,
 )
+import datetime
 
 tok = Tokult.launch(
     'cube_dirty.fits',
@@ -16,9 +17,12 @@ tok.set_region((226, 286), (226, 286), (5, 12))
 # bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265))
 # sol = tok.imagefit(init=init, bound=bound, niter=8)
 
+print(f'Start initialguess: {datetime.datetime.now()}')
 init = tok.initialguess()
 bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265))
+print(f'Start uvfit: {datetime.datetime.now()}')
 sol = tok.uvfit(init=init, bound=bound)
+print(f'End uvfit: {datetime.datetime.now()}')
 
 # init2 = InputParams(
 #     x0_dyn=257.2535169953845,
@@ -37,4 +41,4 @@ sol = tok.uvfit(init=init, bound=bound)
 #     inclination_emi=1.5345414507124888,
 # )
 
-# initialize_globalparameters(tok.datacube)
+# initialize_globalparameters_for_image(tok.datacube)
