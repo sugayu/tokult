@@ -3,7 +3,7 @@
 from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares as sp_least_squares
-from typing import Callable, Sequence, Optional, Union, Any, TYPE_CHECKING
+from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
 from . import function as func
@@ -36,14 +36,15 @@ convolve: Callable = no_convolve
 
 # To fix parameters in fitting
 parameters_preset: Optional[np.ndarray] = None
-index_preset: list[int]
-index_input: list[int]
+index_free: list[int]
+index_fixp_target: list[int]
+index_fixp_source: list[int]
 
 
 def least_square(
     datacube: DataCube,
     init: Sequence[float],
-    bound: Optional[ArrayLike] = None,
+    bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
@@ -68,12 +69,14 @@ def least_square(
 
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
+    _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
     args = (func_fit, mask_use)
 
-    _init = np.copy(init)
+    print('run fitting')
     for _ in range(niter):
-        output = sp_least_squares(calculate_chi, _init, args=args, bounds=bound)
+        output = sp_least_squares(calculate_chi, _init, args=args, bounds=_bound)
         _init = output.x
+    print('end fitting')
 
     p_bestfit = output.x
     dof = datacube.imageplane.size - 1 - len(init)
@@ -82,6 +85,8 @@ def least_square(
     # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
     cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
     result_error = np.sqrt(np.diag(cov))
+    p_bestfit = restore_params(p_bestfit)
+    result_error = restore_params(result_error)
     return Solution(p_bestfit, result_error, chi2, dof, cov)
 
 
@@ -129,7 +134,7 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube on image plane using parameters and the grav. lensing.
     '''
-    _params = reshape_pfix(params)
+    _params = restore_params(params)
     p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = _params
 
     # velocity field
@@ -375,12 +380,13 @@ def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
     - float: the perameter is fixed to the float value
     - True: the parameter has the same value as another parameter
     '''
-    global parameters_preset, index_preset, index_input
+    global parameters_preset, index_free, index_fixp_target, index_fixp_source
     parameters_preset = np.empty(14)
-    index_preset = []
-    index_input = []
+    index_free = []
+    index_fixp_target = []
+    index_fixp_source = []
 
-    parameters_share = FixParams(
+    parameters_fixp = FixParams(
         radius_emi=4, x0_emi=0, y0_emi=1, PA_emi=2, inclination_emi=3
     )
     free_parameter = None
@@ -388,48 +394,58 @@ def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
 
     if (fix is None) and (is_separate):
         parameters_preset = None
+        return
+    elif fix is None:
+        _fix = FixParams()
+    else:
+        _fix = fix
 
-    elif (fix is None) and (not is_separate):
-        for i, value in enumerate(parameters_share):
-            if value is not None:
-                index_preset.append(i)
-                index_input.append(int(value))
+    if is_separate is False:
+        _fix = _fix._replace(
+            radius_emi=True, x0_emi=True, y0_emi=True, PA_emi=True, inclination_emi=True
+        )
 
-    elif fix is not None:
-        for i, p in enumerate(fix):
-            p_is_emi_component = isinstance(parameters_share[i], float)
-            if is_separate and p_is_emi_component:
-                p = True
+    for i, p in enumerate(_fix):
+        p_is_fixed_to_a_value = isinstance(p, float)
 
-            p_is_fixed_to_a_value = isinstance(p, float)
+        if p_is_fixed_to_a_value:
+            parameters_preset[i] = p
 
-            if p_is_fixed_to_a_value:
-                # the perameter is fixed to the float value
-                parameters_preset[i] = p
+        if p is free_parameter:
+            index_free.append(i)
 
-            if p is free_parameter:
-                index_preset.append(i)
-                index_input.append(i)
-
-            if p is fixed_to_another_parameter:
-                if (idx := parameters_share[i]) is None:
-                    raise TypeError(
-                        f'An unsupported parameter p[{i}] is set to True in FixParams.'
-                    )
-                index_preset.append(i)
-                index_input.append(int(idx))
+        if p is fixed_to_another_parameter:
+            if (idx := parameters_fixp[i]) is None:
+                raise TypeError(
+                    f'An unsupported parameter p[{i}] is set to True in FixParams.'
+                )
+            index_fixp_target.append(i)
+            index_fixp_source.append(int(idx))
 
 
-def reshape_pfix(params: tuple[float, ...]) -> tuple[Any, ...]:
-    '''Set fixed parameters with pfix by inserting parameters into params.
+def restore_params(params: tuple[float, ...]) -> tuple[float, ...]:
+    '''Restore parameters with pfix by inserting parameters into params.
     - params -- parameter array. Its length is shorter than 14, which is the
                 total number of parameters.
     '''
-    global parameters_preset, index_preset, index_input
-    if parameters_preset is None:
+    global parameters_preset, index_free, index_fixp_target, index_fixp_source
+    if (parameters_preset is None) or (len(params) == 14):
         return params
-    parameters_preset[index_preset] = np.array(params)[index_input]
+    parameters_preset[index_free] = params
+    parameters_preset[index_fixp_target] = parameters_preset[index_fixp_source]
     return tuple(parameters_preset)
+
+
+def shorten_init_and_bound_ifneeded(
+    init: Sequence[float], bound: tuple[Sequence[float], Sequence[float]]
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
+    '''Shorten init and bound parameter to match appropreate lengths.
+    '''
+    global index_free
+    new_init = tuple(np.array(init)[index_free])
+    new_bound0 = tuple(np.array(bound[0])[index_free])
+    new_bound1 = tuple(np.array(bound[1])[index_free])
+    return new_init, (new_bound0, new_bound1)
 
 
 def initialguess(

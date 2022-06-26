@@ -68,7 +68,7 @@ class Tokult:
     def imagefit(
         self,
         init: Sequence[float],
-        bound: Optional[ArrayLike] = None,
+        bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         niter: int = 1,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
@@ -95,7 +95,7 @@ class Tokult:
     def uvfit(
         self,
         init: Sequence[float],
-        bound: Optional[ArrayLike] = None,
+        bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
     ) -> fitting.Solution:
