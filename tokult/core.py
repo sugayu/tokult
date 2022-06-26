@@ -2,7 +2,7 @@
 '''
 from __future__ import annotations
 import numpy as np
-from scipy.signal import convolve2d
+from scipy.signal import fftconvolve
 from astropy.io import fits
 from astropy import wcs
 from typing import Callable, Sequence, Optional, Union
@@ -420,9 +420,9 @@ class ModelCube(Cube):
         modelcube[vs, ys, xs] = imagecube
 
         if convolve is not None:
-            model_convolved = np.empty_like(modelcube)
-            for i, image in enumerate(modelcube):
-                model_convolved[i, :, :] = convolve(image, index=i)
+            # model_convolved = np.empty_like(modelcube)
+            # for i, image in enumerate(modelcube):
+            model_convolved = convolve(modelcube)
 
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
         return cls(model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
@@ -461,7 +461,7 @@ class DirtyBeam:
         c.logger.error(message)
         raise TypeError(message)
 
-    def convolve(self, image: np.ndarray, index=0) -> np.ndarray:
+    def convolve(self, image: np.ndarray) -> np.ndarray:
         '''Convolve image with dirtybeam (psf).
         '''
         # s1 = np.arange(c.conf.kernel_num)
@@ -472,18 +472,27 @@ class DirtyBeam:
         # st = np.array(c.conf.num_pix * s3 + t3, dtype=int)
         # kernel = self.beam[st]
         # kernel2 = kernel / np.sum(kernel)
-        kernel = self.imageplane[index, :, :]
+        kernel = self.imageplane
         # kernel = beam  / np.sum(beam)
+        dim = len(image.shape)
+        if dim == 2:
+            return fftconvolve(image, kernel[0, :, :], mode='same')
+        elif dim == 3:
+            return fftconvolve(image, kernel, mode='same', axes=(1, 2))
+        else:
+            raise ValueError(f'dimension of image is two or three, not {dim}.')
 
-        # todo: should be changed to fftconvolve
-        return convolve2d(image, kernel, mode='same')
-
-    def fullconvolve(self, image: np.ndarray, index=0) -> np.ndarray:
+    def fullconvolve(self, image: np.ndarray) -> np.ndarray:
         '''Convolve image with original-size dirtybeam (psf).
         '''
-        kernel = self.original[index, :, :]
-        # todo: should be changed to fftconvolve
-        return convolve2d(image, kernel, mode='same')
+        kernel = self.original
+        dim = len(image.shape)
+        if len(image.shape) == 2:
+            return fftconvolve(image, kernel[0, :, :], mode='same')
+        elif len(image.shape) == 3:
+            return fftconvolve(image, kernel, mode='same', axes=(1, 2))
+        else:
+            raise ValueError(f'dimension of image is two or three, not {dim}.')
 
     def cutout(
         self,

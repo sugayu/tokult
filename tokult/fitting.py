@@ -72,11 +72,9 @@ def least_square(
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
     args = (func_fit, mask_use)
 
-    print('run fitting')
     for _ in range(niter):
         output = sp_least_squares(calculate_chi, _init, args=args, bounds=_bound)
         _init = output.x
-    print('end fitting')
 
     p_bestfit = output.x
     dof = datacube.imageplane.size - 1 - len(init)
@@ -114,9 +112,10 @@ def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
     model = construct_model_at_imageplane(params)
-    model_convolved = np.empty_like(model)
-    for i, image in enumerate(model):
-        model_convolved[i, :, :] = convolve(image, index=i)
+    model_convolved = convolve(model)
+    # model_convolved = np.empty_like(model)
+    # for i, image in enumerate(model):
+    #     model_convolved[i, :, :] = convolve(image, index=i)
     return model_convolved
 
 
@@ -206,7 +205,7 @@ def construct_model_moment0(params: list[float]) -> np.ndarray:
     coord_image_i = np.moveaxis(np.array([xx_grid - p0, yy_grid - p1]), 0, -1)
     rr_i, _ = to_objectcoord_from(coord_image_i, PA=p2, incl=p3)
     intensity = func.reciprocal_exp(rr_i, norm=p5, rnorm=p4)
-    model = convolve(intensity, index=0)
+    model = convolve(intensity)
 
     return model
 

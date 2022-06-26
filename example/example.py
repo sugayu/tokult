@@ -13,9 +13,12 @@ tok = Tokult.launch(
 )
 tok.set_region((226, 286), (226, 286), (5, 12))
 
+# print(f'Start initialguess: {datetime.datetime.now()}')
 # init = tok.initialguess()
 # bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265))
+# print(f'Start imagefit: {datetime.datetime.now()}')
 # sol = tok.imagefit(init=init, bound=bound, niter=8)
+# print(f'End imagefit: {datetime.datetime.now()}')
 
 print(f'Start initialguess: {datetime.datetime.now()}')
 init = tok.initialguess()
