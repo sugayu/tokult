@@ -578,8 +578,8 @@ def write_beamtxt():
     hdul.close()
 
 
-def write_gravlenz():
-    '''Write down gravlenz infomation into *.txt files
+def write_gravlens():
+    '''Write down gravlens infomation into *.txt files
     '''
     imagename1 = c.fnames.dname_mom + c.fnames.line_dirty_mom0_fits
     hdul = fits.open(imagename1)
@@ -608,7 +608,7 @@ def write_gravlenz():
 
     dname = c.fnames.dname_gl
     Path(dname).mkdir(exist_ok=True)
-    fname_gl = dname + c.fnames.gravlenz
+    fname_gl = dname + c.fnames.gravlens
     with open(fname_gl, 'w') as f:
         for x_pix in range(int(xlow), int(xup + 1)):
             for y_pix in range(int(ylow), int(yup + 1)):
@@ -625,10 +625,10 @@ def write_gravlenz():
     hdul_kappa.close()
 
 
-def glenzing(
+def glensing(
     pos: np.ndarray, g1: np.ndarray, g2: np.ndarray, k: np.ndarray
 ) -> np.ndarray:
-    '''Convert coordinates with gravitational lenzing from image plane to source plane.
+    '''Convert coordinates with gravitational lensing from image plane to source plane.
     Keyword Arguments:
     pos -- position array including (x, y). shape: (n, m, 2) and shape of x: (n, m)
     g1, g2, k -- gamma1, gamma2, kappa array. shape: (n, m)
@@ -687,7 +687,7 @@ def fitting_mom0():
     rms_mom0 = imstat(c.fnames.dname_mom + c.fnames.line_dirty_mom0)['rms'][0]
     fe = rms_mom0
 
-    fname_gl = c.fnames.dname_gl + c.fnames.gravlenz
+    fname_gl = c.fnames.dname_gl + c.fnames.gravlens
     xgl, ygl, gamma1, gamma2, kappa = np.loadtxt(fname_gl, comments='!', unpack=True)
 
     res_imfit = imfit(imagename=fmom0, region=c.conf.region, rms=rms_mom0)
@@ -715,7 +715,7 @@ def fitting_mom0():
         g2 = gamma2[idx]
         k = kappa[idx]
         pos_grid = np.array([(xx_grid - p[0]), (yy_grid - p[1])]).transpose(1, 2, 0)
-        pos_grid = glenzing(pos_grid, g1, g2, k)
+        pos_grid = glensing(pos_grid, g1, g2, k)
         pos_grid = rotate_coord(pos_grid, -p[2])
         xx, yy = pos_grid.transpose(2, 0, 1)
 
@@ -790,7 +790,7 @@ def fitting_velocity2d(param_fit_mom0):
     fname_vel = c.fnames.dname_cube + c.fnames.velocity
     xv, yv, Vs, Vse = np.loadtxt(fname_vel, comments='!', unpack=True)
 
-    c.fnames_gl = c.fnames.dname_gl + c.fnames.gravlenz
+    c.fnames_gl = c.fnames.dname_gl + c.fnames.gravlens
     xgl, ygl, gamma1, gamma2, kappa = np.loadtxt(c.fnames_gl, comments='!', unpack=True)
     G = 1
 
@@ -800,7 +800,7 @@ def fitting_velocity2d(param_fit_mom0):
         g2 = gamma2[idx]
         k = kappa[idx]
         pos_grid = np.array([xx_grid - p[5], yy_grid - p[6]]).transpose(1, 2, 0)
-        pos_grid = glenzing(pos_grid, g1, g2, k)
+        pos_grid = glensing(pos_grid, g1, g2, k)
         pos_grid = rotate_coord(pos_grid, -p[4])
         xx, yy = pos_grid.transpose(2, 0, 1)
 
@@ -918,7 +918,7 @@ def fitting_cube3d(param_m, param_v):
 
     fname_beamdat = c.fnames.dname_cube + c.fnames.beam_dat
     _, _, Sbeam = np.loadtxt(fname_beamdat, comments='!', unpack=True)
-    fname_gl = c.fnames.dname_gl + c.fnames.gravlenz
+    fname_gl = c.fnames.dname_gl + c.fnames.gravlens
     xgl, ygl, gamma1, gamma2, kappa = np.loadtxt(fname_gl, comments='!', unpack=True)
 
     fmom0 = c.fnames.dname_mom + c.fnames.line_dirty_mom0
@@ -970,7 +970,7 @@ def fitting_cube3d(param_m, param_v):
 
         # velocity field
         pos_grid = np.array([xx_grid - p0, yy_grid - p1]).transpose(1, 2, 3, 0)
-        pos_grid = glenzing(pos_grid, g1, g2, k)
+        pos_grid = glensing(pos_grid, g1, g2, k)
         pos_grid = rotate_coord(pos_grid, -p2)
         xx, yy = pos_grid.transpose(3, 0, 1, 2)
         yy = yy / np.cos(p3)  # inclination
@@ -984,7 +984,7 @@ def fitting_cube3d(param_m, param_v):
 
         # spatial flux
         pos_grid = np.array([xx_grid - p10, yy_grid - p11]).transpose(1, 2, 3, 0)
-        pos_grid = glenzing(pos_grid, g1, g2, k)
+        pos_grid = glensing(pos_grid, g1, g2, k)
         pos_grid = rotate_coord(pos_grid, -p12)
         xx_f, yy_f = pos_grid.transpose(3, 0, 1, 2)
         yy_f = yy_f / np.cos(p13)

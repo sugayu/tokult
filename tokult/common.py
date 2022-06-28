@@ -72,7 +72,7 @@ class Config:
     def convert_config2dict(config: ConfigParser) -> dict[str, str]:
         '''Convert data types of configure.
         '''
-        list_section = ['glavlenz', 'casa']
+        list_section = ['glavlens', 'casa']
         output_dict: dict[str, str] = dict(config['DEFAULT'].items())
         for section in list_section:
             if config.has_section(section):
@@ -101,14 +101,14 @@ class FileManager:
         self.dname_project: str = self.project + '/'
         self.log: str = self.dname_project + 'tokult.log'
 
-    def readconfig_gravlenz(self) -> None:
-        '''Read config about gravitational lenzing to define filename variables
+    def readconfig_gravlens(self) -> None:
+        '''Read config about gravitational lensing to define filename variables
         '''
-        self.dname_gl: str = 'gravlenz/'
+        self.dname_gl: str = 'gravlens/'
         self.gamma1: str = 'gamma1.fits'
         self.gamma2: str = 'gamma2.fits'
         self.kappa: str = 'kappa.fits'
-        self.gravlenz: str = 'gravlenz.txt'
+        self.gravlens: str = 'gravlens.txt'
 
     def readconfig_casa(self) -> None:
         '''Read config about CASA analyses to define filename variables
