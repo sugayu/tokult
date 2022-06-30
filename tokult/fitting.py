@@ -7,7 +7,7 @@ from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
 from . import function as func
-from .misc import rotate_coord, polar_coord, no_lensing, no_convolve, fft2
+from .misc import rotate_coord, polar_coord, no_lensing, no_convolve, fft2, ifft2
 
 if TYPE_CHECKING:
     from .core import DataCube
@@ -33,6 +33,7 @@ xslice: slice
 yslice: slice
 lensing: Callable = no_lensing
 convolve: Callable = no_convolve
+mask_FoV: np.ndarray
 
 # To fix parameters in fitting
 parameters_preset: Optional[np.ndarray] = None
@@ -122,12 +123,13 @@ def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
-    global cube, yslice, xslice, beam_visibility
+    global cube, yslice, xslice, beam_visibility, mask_FoV
     model_cutout = construct_model_at_imageplane(params)
     model_image = np.zeros_like(cube)
     model_image[:, yslice, xslice] = model_cutout
     model_visibility = fft2(model_image)
-    return model_visibility * beam_visibility
+    image = ifft2(model_visibility * beam_visibility)
+    return fft2(image * mask_FoV)
 
 
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
@@ -250,7 +252,7 @@ class InputParams(NamedTuple):
     x0_dyn: float
     y0_dyn: float
     PA_dyn: float
-    incliation_dyn: float
+    inclination_dyn: float
     radius_dyn: float
     velocity_sys: float
     mass_dyn: float
@@ -267,7 +269,7 @@ def get_bound_params(
     x0_dyn: tuple[float, float] = (-np.inf, np.inf),
     y0_dyn: tuple[float, float] = (-np.inf, np.inf),
     PA_dyn: tuple[float, float] = (0.0, 2 * np.pi),
-    incliation_dyn: tuple[float, float] = (0.0, np.pi / 2),
+    inclination_dyn: tuple[float, float] = (0.0, np.pi / 2),
     radius_dyn: tuple[float, float] = (0.0, np.inf),
     velocity_sys: tuple[float, float] = (-np.inf, np.inf),
     mass_dyn: tuple[float, float] = (0.0, np.inf),
@@ -287,7 +289,7 @@ def get_bound_params(
             x0_dyn=x0_dyn[i],
             y0_dyn=y0_dyn[i],
             PA_dyn=PA_dyn[i],
-            incliation_dyn=incliation_dyn[i],
+            inclination_dyn=inclination_dyn[i],
             radius_dyn=radius_dyn[i],
             velocity_sys=velocity_sys[i],
             mass_dyn=mass_dyn[i],
@@ -333,7 +335,7 @@ def initialize_globalparameters_for_uv(
     '''Set global parameters used in fitting.py in the uv plane.
     '''
     global cube, cube_error, xx_grid, yy_grid, vv_grid, xslice, yslice
-    global lensing, beam_visibility
+    global lensing, beam_visibility, mask_FoV
 
     cube = np.copy(datacube.uvplane)
     cube_error = np.array(1.0)
@@ -345,6 +347,7 @@ def initialize_globalparameters_for_uv(
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
     xslice, yslice = (datacube.xslice, datacube.yslice)
     beam_visibility = beam_vis
+    mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_lensing: Callable = no_lensing
@@ -358,7 +361,7 @@ class FixParams(NamedTuple):
     x0_dyn: Optional[float] = None
     y0_dyn: Optional[float] = None
     PA_dyn: Optional[float] = None
-    incliation_dyn: Optional[float] = None
+    inclination_dyn: Optional[float] = None
     radius_dyn: Optional[float] = None
     velocity_sys: Optional[float] = None
     mass_dyn: Optional[float] = None
@@ -466,7 +469,7 @@ def initialguess(
         x0_dyn=param1[5],
         y0_dyn=param1[6],
         PA_dyn=param1[4],
-        incliation_dyn=param1[0],
+        inclination_dyn=param1[0],
         radius_dyn=param1[1],
         velocity_sys=param1[3],
         mass_dyn=param1[2],

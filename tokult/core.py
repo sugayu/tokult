@@ -214,10 +214,14 @@ class Cube:
         self.imageplane = imageplane
         self.header = header
         self.uvplane = self.fft2(self.original, zero_padding=True)
+        self.mask_FoV = np.logical_not(np.equal(self.original, 0.0)).astype(int)
 
         self.xlim: tuple[int, int]
         self.ylim: tuple[int, int]
         self.vlim: tuple[int, int]
+        self.xslice: slice
+        self.yslice: slice
+        self.vslice: slice
         self.vgrid: np.ndarray
         self.xgrid: np.ndarray
         self.ygrid: np.ndarray
@@ -424,8 +428,9 @@ class ModelCube(Cube):
             # for i, image in enumerate(modelcube):
             model_convolved = convolve(modelcube)
 
+        model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
-        return cls(model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
+        return cls(model_masked, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:
