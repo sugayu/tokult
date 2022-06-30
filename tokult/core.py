@@ -72,23 +72,37 @@ class Tokult:
         niter: int = 1,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
 
-        solution = fitting.least_square(
-            self.datacube,
-            init,
-            bound,
-            func_convolve=func_convolve,
-            func_lensing=func_lensing,
-            niter=niter,
-            mode_fit='image',
-            fix=fix,
-            is_separate=is_separate,
-        )
+        if optimization == 'mcmc':
+            solution = fitting.mcmc(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                mode_fit='image',
+                fix=fix,
+                is_separate=is_separate,
+            )
+        elif optimization == 'ls':
+            solution = fitting.least_square(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                mode_fit='image',
+                fix=fix,
+                is_separate=is_separate,
+            )
         self.construct_modelcube(solution.best)
         return solution
 
@@ -98,6 +112,7 @@ class Tokult:
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
@@ -109,16 +124,28 @@ class Tokult:
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
 
-        solution = fitting.least_square(
-            self.datacube,
-            init,
-            bound,
-            beam_vis=beam_visibility,
-            func_lensing=func_lensing,
-            mode_fit='uv',
-            fix=fix,
-            is_separate=is_separate,
-        )
+        if optimization == 'mcmc':
+            solution = fitting.mcmc(
+                self.datacube,
+                init,
+                bound,
+                beam_vis=beam_visibility,
+                func_lensing=func_lensing,
+                mode_fit='uv',
+                fix=fix,
+                is_separate=is_separate,
+            )
+        elif optimization == 'ls':
+            solution = fitting.least_square(
+                self.datacube,
+                init,
+                bound,
+                beam_vis=beam_visibility,
+                func_lensing=func_lensing,
+                mode_fit='uv',
+                fix=fix,
+                is_separate=is_separate,
+            )
         self.construct_modelcube(solution.best)
         return solution
 

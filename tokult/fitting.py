@@ -2,10 +2,14 @@
 '''
 from __future__ import annotations
 import numpy as np
+from numpy.random import default_rng
 from scipy.optimize import least_squares as sp_least_squares
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
+import emcee
+from emcee.moves import DEMove, DESnookerMove
+import multiprocessing
 from . import function as func
 from .misc import rotate_coord, polar_coord, no_lensing, no_convolve, fft2, ifft2
 
@@ -36,7 +40,7 @@ convolve: Callable = no_convolve
 mask_FoV: np.ndarray
 
 # To fix parameters in fitting
-parameters_preset: Optional[np.ndarray] = None
+parameters_preset: Optional[np.ndarray]
 index_free: list[int]
 index_fixp_target: list[int]
 index_fixp_source: list[int]
@@ -46,13 +50,13 @@ def least_square(
     datacube: DataCube,
     init: Sequence[float],
     bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+    fix: Optional[FixParams] = None,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
     mask_use: Optional[ArrayLike] = None,
     niter: int = 1,
     mode_fit: str = 'image',
-    fix: Optional[FixParams] = None,
     is_separate: bool = False,
 ) -> Solution:
     '''Least square fitting using scipy.optimize.least_squares
@@ -89,6 +93,63 @@ def least_square(
     return Solution(p_bestfit, result_error, chi2, dof, cov)
 
 
+def mcmc(
+    datacube: DataCube,
+    init: Sequence[float],
+    bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+    fix: Optional[FixParams] = None,
+    func_convolve: Optional[Callable] = None,
+    func_lensing: Optional[Callable] = None,
+    beam_vis: Optional[np.ndarray] = None,
+    mask_use: Optional[ArrayLike] = None,
+    niter: int = 1,
+    mode_fit: str = 'image',
+    is_separate: bool = False,
+    nwalkers: int = 64,
+    nsteps: int = 10000,
+) -> Solution:
+    '''MCMC using emcee
+    '''
+    rng = default_rng(222)
+
+    if mode_fit == 'image':
+        initialize_globalparameters_for_image(datacube, func_convolve, func_lensing)
+        func_fit = construct_convolvedmodel
+    elif mode_fit == 'uv':
+        if beam_vis is None:
+            raise ValueError('"beam_vis" is necessarily for uvfit')
+        initialize_globalparameters_for_uv(datacube, beam_vis, func_lensing)
+        func_fit = construct_uvmodel
+    else:
+        raise ValueError(f'mode_fit is "image" or "uv", no option for "{mode_fit}".')
+
+    set_fixedparameters(fix, is_separate)
+    bound = get_bound_params() if bound is None else bound
+    _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
+    args = (func_fit, _bound, mask_use)
+
+    ndim = len(_init)
+    __init = np.array(_init)
+    __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
+    with multiprocessing.get_context('fork').Pool() as pool:
+        sampler = emcee.EnsembleSampler(
+            nwalkers,
+            ndim,
+            calculate_log_probability,
+            args=args,
+            pool=pool,
+            moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2),],
+        )
+        sampler.run_mcmc(__init, nsteps, progress=True)
+
+    flat_samples = sampler.get_chain(discard=50, thin=10, flat=True)
+    p_bestfit = np.percentile(flat_samples, [50], axis=0)
+    error = np.percentile(flat_samples, [84], axis=0) - p_bestfit
+    p_bestfit = restore_params(p_bestfit)
+    error = restore_params(error)
+    return Solution(p_bestfit, error, 0.0, 0.0, np.array(0.0), sampler=sampler)
+
+
 def calculate_chi(
     params: tuple[float, ...], model_func: Callable, index: Optional[ArrayLike] = None,
 ) -> np.ndarray:
@@ -107,6 +168,33 @@ def calculate_chi(
 
     chi = abs(cube - model) / cube_error
     return chi.ravel()
+
+
+def calculate_log_probability(
+    params: tuple[float, ...],
+    model_func: Callable,
+    bound: tuple[Sequence[float], Sequence[float]],
+    index: Optional[ArrayLike] = None,
+) -> float:
+    '''Calcurate log probability for MCMC technique.
+    '''
+    log_prior = calculate_log_prior(params, bound)
+    if not np.isfinite(log_prior):
+        return -np.inf
+    log_likelihood = -0.5 * np.sum(calculate_chi(params, model_func, index))
+    return log_prior + log_likelihood
+
+
+def calculate_log_prior(
+    params: tuple[float, ...], bound: tuple[Sequence[float], Sequence[float]]
+) -> float:
+    '''Calcurate log prior of parameters for MCMC technique.
+    '''
+    _params = np.array(params)
+    bound0, bound1 = (np.array(bound[0]), np.array(bound[1]))
+    if np.all(bound0 < _params) and np.all(_params < bound1):
+        return 0.0
+    return -np.inf
 
 
 def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
@@ -237,12 +325,14 @@ class Solution:
         chi2: float,
         dof: float,
         cov: np.ndarray,
+        sampler: None = None,
     ) -> None:
         self.best = InputParams(*p_best)
         self.error = InputParams(*error)
         self.chi2 = chi2
         self.dof = dof
         self.cov = cov
+        self.sampler = sampler
 
 
 class InputParams(NamedTuple):
