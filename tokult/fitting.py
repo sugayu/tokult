@@ -106,7 +106,7 @@ def mcmc(
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
-    nsteps: int = 10000,
+    nsteps: int = 100000,
 ) -> Solution:
     '''MCMC using emcee
     '''
@@ -131,7 +131,7 @@ def mcmc(
     ndim = len(_init)
     __init = np.array(_init)
     __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
-    with multiprocessing.get_context('fork').Pool() as pool:
+    with multiprocessing.get_context('fork').Pool(8) as pool:
         sampler = emcee.EnsembleSampler(
             nwalkers,
             ndim,
@@ -229,7 +229,7 @@ def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     # velocity field
     coord_image_v = np.moveaxis(np.array([xx_grid - p0, yy_grid - p1]), 0, -1)
     rr, pphi = to_objectcoord_from(coord_image_v, PA=p2, incl=p3)
-    velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=p6, rnorm=p4, incl=p3)
+    velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p6, rnorm=p4, incl=p3)
 
     # spatial intensity distribution
     coord_image_i = np.moveaxis(np.array([xx_grid - p10, yy_grid - p11]), 0, -1)
@@ -307,7 +307,7 @@ def construct_model_moment1(params: list[float]) -> np.ndarray:
 
     coord_image_v = np.moveaxis(np.array([xx_grid - p5, yy_grid - p6]), 0, -1)
     rr, pphi = to_objectcoord_from(coord_image_v, PA=p4, incl=p0)
-    velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=p2, rnorm=p1, incl=p0)
+    velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p2, rnorm=p1, incl=p0)
     # # NOTE: convolving velocity is correct?
     # model = convolve(velocity, index=0)
 
@@ -362,7 +362,7 @@ def get_bound_params(
     inclination_dyn: tuple[float, float] = (0.0, np.pi / 2),
     radius_dyn: tuple[float, float] = (0.0, np.inf),
     velocity_sys: tuple[float, float] = (-np.inf, np.inf),
-    mass_dyn: tuple[float, float] = (0.0, np.inf),
+    mass_dyn: tuple[float, float] = (-np.inf, np.inf),
     brightness_center: tuple[float, float] = (0.0, np.inf),
     velocity_dispersion: tuple[float, float] = (0.0, np.inf),
     radius_emi: tuple[float, float] = (0.0, np.inf),
@@ -551,7 +551,7 @@ def initialguess(
 
     p = param0
     vcen = np.sum(datacube.vlim) / 2.0
-    init = [p[3], p[4], 10.0, vcen, p[2], p[0], p[1]]
+    init = [p[3], p[4], 1.0, vcen, p[2], p[0], p[1]]
 
     param1 = least_square_moment1(datacube, init, func_convolve, func_lensing)
 
@@ -611,7 +611,7 @@ def least_square_moment1(
     func_fit = construct_model_moment1
 
     bound = (
-        (0, 0, 0, -np.inf, 0, -np.inf, -np.inf),
+        (0, 0, -np.inf, -np.inf, 0, -np.inf, -np.inf),
         (0.5 * np.pi, np.inf, np.inf, np.inf, 2 * np.pi, np.inf, np.inf),
     )
 
