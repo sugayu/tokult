@@ -1,9 +1,13 @@
 '''Modules of fitting functions
 '''
 from __future__ import annotations
+from dataclasses import dataclass, field
 import numpy as np
 from numpy.random import default_rng
 from scipy.optimize import least_squares as sp_least_squares
+from astropy.io import fits
+from astropy import units as u
+from astropy.wcs import WCS
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
@@ -11,7 +15,7 @@ import emcee
 from emcee.moves import DEMove, DESnookerMove
 import multiprocessing
 from . import function as func
-from .misc import rotate_coord, polar_coord, no_lensing, no_convolve, fft2, ifft2
+from . import misc
 
 if TYPE_CHECKING:
     from .core import DataCube
@@ -35,8 +39,8 @@ yy_grid: np.ndarray
 vv_grid: np.ndarray
 xslice: slice
 yslice: slice
-lensing: Callable = no_lensing
-convolve: Callable = no_convolve
+lensing: Callable = misc.no_lensing
+convolve: Callable = misc.no_convolve
 mask_FoV: np.ndarray
 
 # To fix parameters in fitting
@@ -138,16 +142,11 @@ def mcmc(
             calculate_log_probability,
             args=args,
             pool=pool,
-            moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2),],
+            moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2)],
         )
         sampler.run_mcmc(__init, nsteps, progress=True)
 
-    flat_samples = sampler.get_chain(discard=50, thin=10, flat=True)
-    p_bestfit = np.percentile(flat_samples, [50], axis=0)
-    error = np.percentile(flat_samples, [84], axis=0) - p_bestfit
-    p_bestfit = restore_params(p_bestfit)
-    error = restore_params(error)
-    return Solution(p_bestfit, error, 0.0, 0.0, np.array(0.0), sampler=sampler)
+    return Solution.from_sampler(sampler)
 
 
 def calculate_chi(
@@ -215,9 +214,9 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     model_cutout = construct_model_at_imageplane(params)
     model_image = np.zeros_like(cube)
     model_image[:, yslice, xslice] = model_cutout
-    model_visibility = fft2(model_image)
-    image = ifft2(model_visibility * beam_visibility)
-    return fft2(image * mask_FoV)
+    model_visibility = misc.fft2(model_image)
+    image = misc.ifft2(model_visibility * beam_visibility)
+    return misc.fft2(image * mask_FoV)
 
 
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
@@ -250,10 +249,10 @@ def to_objectcoord_from(
     inclination = incl
 
     coord_source = lensing(coord_image)
-    coord_object = rotate_coord(coord_source, pa)
+    coord_object = misc.rotate_coord(coord_source, pa)
     xx, yy = np.moveaxis(coord_object, -1, 0)
     yy = yy / np.cos(inclination)
-    r, phi = polar_coord(xx, yy)
+    r, phi = misc.polar_coord(xx, yy)
     return r, phi
 
 
@@ -266,7 +265,7 @@ def construct_model_at_imageplane_with(
 ) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
-    lensing = no_lensing if lensing is None else lensing
+    lensing = misc.no_lensing if lensing is None else lensing
     keys_globals = [
         'xx_grid',
         'yy_grid',
@@ -334,6 +333,20 @@ class Solution:
         self.cov = cov
         self.sampler = sampler
 
+    @classmethod
+    def from_sampler(cls, sampler: emcee.EnsembleSampler) -> Solution:
+        '''Construct Solution() from sampler.
+        '''
+        discard = 50
+        thin = 10
+        flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
+
+        best = np.percentile(flat_samples, [50], axis=0)
+        best = restore_params(best)
+        error = np.percentile(flat_samples, [84], axis=0) - best
+        error = restore_params(error)
+        return cls(best, error, 0.0, 0.0, np.array(0.0), sampler=sampler)
+
 
 class InputParams(NamedTuple):
     '''Input parameters for construct_model_at_imageplane.
@@ -353,6 +366,138 @@ class InputParams(NamedTuple):
     y0_emi: float
     PA_emi: float
     inclination_emi: float
+
+    def to_units(self, header: fits.Header) -> FitParamsWithUnits:
+        '''Return input parameters with units.
+        '''
+        return FitParamsWithUnits.from_inputparams(self)
+
+
+@dataclass
+class FitParamsWithUnits:
+    '''Fitting parameters with units.
+    '''
+
+    x0_dyn: u.Quantity
+    y0_dyn: u.Quantities
+    PA_dyn: u.Quantities
+    inclination_dyn: u.Quantities
+    radius_dyn: u.Quantities
+    velocity_sys: u.Quantities
+    mass_dyn: u.Quantities
+    brightness_center: u.Quantities
+    velocity_dispersion: u.Quantities
+    radius_emi: u.Quantities
+    x0_emi: u.Quantities
+    y0_emi: u.Quantities
+    PA_emi: u.Quantities
+    inclination_emi: u.Quantities
+    header: Optional[fits.Header] = field(default=None, repr=False)
+    z: float = field(default=0.0, repr=False)
+    wcs: Optional[WCS] = field(init=False, repr=False)
+    pixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
+    freq_rest: Optional[u.Quantities] = field(init=False, repr=False)
+    vpixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
+    diskmassscale: Optional[u.Equivalency] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.header:
+            self.wcs = WCS(self.header)
+            self.freq_rest = self.header['RESTFRQ'] * u.Hz
+
+            deg_pix = abs(self.header['CDELT1']) * u.Unit(self.header['CUNIT1']) / u.pix
+            self.pixelscale = misc.pixel_scale(deg_pix.to(u.arcsec / u.pix), self.z)
+
+            dfreq_pix = abs(self.header['CDELT3']) * u.Unit(self.header['CUNIT3'])
+            opt_equiv = u.doppler_optical(self.freq_rest)
+            dv_pix = (self.freq_rest - dfreq_pix).to(u.km / u.s, opt_equiv)
+            self.vpixelscale = misc.vpixel_scale(dv_pix / u.pix)
+
+            self.diskmassscale = (
+                misc.diskmass_scale(self.pixelscale, self.vpixelscale)
+                if self.z > 0.0
+                else None
+            )
+
+        else:
+            self.wcs = None
+            self.pixelscale = None
+            self.freq_rest = None
+            self.vpixelscale = None
+            self.diskmassscale = None
+
+    def to_physicalscale(self) -> None:
+        '''Convert values to physicalscales.
+        '''
+        if self.header is None:
+            raise ValueError('header is not input.')
+        assert isinstance(self.wcs, WCS)
+
+        wcs_celestial = self.wcs.celestial
+        wcs_spectral = self.wcs.spectral
+        coord_celestial = wcs_celestial.pixel_to_world(
+            [self.x0_dyn, self.x0_emi], [self.y0_dyn, self.y0_emi]
+        )
+        coord_spectral = wcs_spectral.pixel_to_world(self.velocity_sys)
+        coord_spectral_kms = coord_spectral.to(
+            u.km / u.s, doppler_convention='optical', doppler_rest=self.freq_rest
+        )
+        self.x0_dyn = coord_celestial.ra[0]
+        self.y0_dyn = coord_celestial.dec[0]
+        self.x0_emi = coord_celestial.ra[1]
+        self.y0_emi = coord_celestial.dec[1]
+        self.velocity_sys = coord_spectral_kms.quantity
+
+        self.radius_dyn = self.radius_dyn.to(u.arcsec, self.pixelscale)
+        self.radius_emi = self.radius_emi.to(u.arcsec, self.pixelscale)
+        self.brightness_center = self.brightness_center.to(
+            u.Jy / u.arcsec ** 2, self.pixelscale
+        )
+        self.velocity_dispersion = self.velocity_dispersion.to(
+            u.km / u.s, self.vpixelscale
+        )
+
+        if self.z > 0.0:
+            self.radius_dyn = self.radius_dyn.to(u.kpc, self.pixelscale)
+            self.radius_emi = self.radius_emi.to(u.kpc, self.pixelscale)
+            self.mass_dyn = self.mass_dyn.physical.to(u.Msun, self.diskmassscale)
+
+    @classmethod
+    def from_inputparams(
+        cls,
+        inputparams: InputParams,
+        header: Optional[fits.Header] = None,
+        z: float = 0.0,
+    ) -> FitParamsWithUnits:
+        '''Constructer from dict
+        '''
+        dictionary = inputparams._asdict()
+        input_dict = {}
+        units = (
+            u.dimensionless_unscaled,
+            u.dimensionless_unscaled,
+            u.rad,
+            u.rad,
+            u.pix,
+            u.pix,
+            u.dex(u.pix ** 3),
+            u.Jy / u.pix / u.pix,
+            u.pix,
+            u.pix,
+            u.dimensionless_unscaled,
+            u.dimensionless_unscaled,
+            u.rad,
+            u.rad,
+        )
+        for (key, value), unit in zip(dictionary.items(), units):
+            input_dict[key] = value * unit
+
+        if header is None:
+            return cls(**input_dict)
+        else:
+            clsself = cls(header=header, z=z, **input_dict)
+            clsself.to_physicalscale()
+            return clsself
 
 
 def get_bound_params(
@@ -413,8 +558,8 @@ def initialize_globalparameters_for_image(
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
-    f_no_convolve: Callable = no_convolve
-    f_no_lensing: Callable = no_lensing
+    f_no_convolve: Callable = misc.no_convolve
+    f_no_lensing: Callable = misc.no_lensing
     convolve = func_convolve if func_convolve else f_no_convolve
     lensing = func_lensing if func_lensing else f_no_lensing
 
@@ -440,7 +585,7 @@ def initialize_globalparameters_for_uv(
     mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
-    f_no_lensing: Callable = no_lensing
+    f_no_lensing: Callable = misc.no_lensing
     lensing = func_lensing if func_lensing else f_no_lensing
 
 
@@ -649,7 +794,7 @@ def initialize_globalparameters_for_moment(
     yy_grid = yy_grid[0, :, :]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
-    f_no_convolve: Callable = no_convolve
-    f_no_lensing: Callable = no_lensing
+    f_no_convolve: Callable = misc.no_convolve
+    f_no_lensing: Callable = misc.no_lensing
     convolve = func_convolve if func_convolve else f_no_convolve
     lensing = func_lensing if func_lensing else f_no_lensing

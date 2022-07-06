@@ -6,6 +6,9 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional, Any
 import numpy as np
+from astropy.cosmology import FlatLambdaCDM
+import astropy.constants as astroconst
+import astropy.units as u
 import logging
 from logging.config import dictConfig
 from configparser import ConfigParser
@@ -163,7 +166,7 @@ class Const:
     kpcm: float = 3.085677581e19
     # mpix = 1 / kpcm / pixkpc
     kgMo: float = 1 / (1.989e30)
-    g: float = 6.67e-11
+    G: u.Quantity = astroconst.G
 
 
 def initialize_tokult(file_init: Optional[str] = None) -> None:
@@ -231,3 +234,4 @@ const: Const = Const()
 conf = Config('temp')
 fnames = FileManager(conf)
 logger = logging.getLogger(__name__)
+cosmo = FlatLambdaCDM(H0=70, Om0=0.3, Ob0=0.04)
