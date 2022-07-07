@@ -17,7 +17,7 @@ print(f'Start initialguess: {datetime.datetime.now()}')
 init = tok.initialguess()
 bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265), velocity_sys=(5, 12))
 print(f'Start imagefit: {datetime.datetime.now()}')
-sol_im = tok.imagefit(init=init, bound=bound, niter=8)
+sol_im = tok.imagefit(init=init, bound=bound, optimization='ls')
 print(f'End imagefit: {datetime.datetime.now()}')
 
 # tok_uv = Tokult.launch(

@@ -3,10 +3,19 @@
 import numpy as np
 from astropy import units as u
 import astropy.constants as const
+from typing import Optional
 from .common import cosmo
 
 
 ##
+def rms(cube: np.ndarray, axis: Optional[tuple[int, ...]] = None) -> np.ndarray:
+    '''Compute r.m.s.
+    '''
+    sumsq = np.nansum(cube ** 2, axis=axis)
+    n = np.count_nonzero(cube, axis=axis)
+    return np.sqrt(sumsq / n)
+
+
 def rotate_coord(pos: np.ndarray, angle: float) -> np.ndarray:
     '''Rotate (x,y) coordinates
     Keyword Arguments:

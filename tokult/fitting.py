@@ -781,7 +781,7 @@ def initialize_globalparameters_for_moment(
 
     if mom == 0:
         cube = datacube.moment0()
-        cube_error = datacube.rms_moment0()
+        cube_error = np.array(datacube.rms_moment0())
     elif mom == 1:
         rms = datacube.rms_moment0()
         cube = datacube.pixmoment1(thresh=3 * rms)
