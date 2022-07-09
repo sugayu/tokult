@@ -2,14 +2,16 @@
 '''
 from __future__ import annotations
 import numpy as np
+from numpy.random import default_rng
 from scipy.signal import fftconvolve
 from astropy.io import fits
 from astropy import wcs
 from typing import Callable, Sequence, Optional, Union
-from numpy.typing import ArrayLike
 from . import common as c
 from . import fitting
-from .misc import fft2
+from . import misc
+
+__all__ = ['Tokult', 'DataCube', 'ModelCube', 'DirtyBeam', 'GravLens']
 
 
 ##
@@ -72,23 +74,37 @@ class Tokult:
         niter: int = 1,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
 
-        solution = fitting.least_square(
-            self.datacube,
-            init,
-            bound,
-            func_convolve=func_convolve,
-            func_lensing=func_lensing,
-            niter=niter,
-            mode_fit='image',
-            fix=fix,
-            is_separate=is_separate,
-        )
+        if optimization == 'mcmc':
+            solution = fitting.mcmc(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                mode_fit='image',
+                fix=fix,
+                is_separate=is_separate,
+            )
+        elif optimization == 'ls':
+            solution = fitting.least_square(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                mode_fit='image',
+                fix=fix,
+                is_separate=is_separate,
+            )
         self.construct_modelcube(solution.best)
         return solution
 
@@ -98,6 +114,7 @@ class Tokult:
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
@@ -109,16 +126,28 @@ class Tokult:
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
 
-        solution = fitting.least_square(
-            self.datacube,
-            init,
-            bound,
-            beam_vis=beam_visibility,
-            func_lensing=func_lensing,
-            mode_fit='uv',
-            fix=fix,
-            is_separate=is_separate,
-        )
+        if optimization == 'mcmc':
+            solution = fitting.mcmc(
+                self.datacube,
+                init,
+                bound,
+                beam_vis=beam_visibility,
+                func_lensing=func_lensing,
+                mode_fit='uv',
+                fix=fix,
+                is_separate=is_separate,
+            )
+        elif optimization == 'ls':
+            solution = fitting.least_square(
+                self.datacube,
+                init,
+                bound,
+                beam_vis=beam_visibility,
+                func_lensing=func_lensing,
+                mode_fit='uv',
+                fix=fix,
+                is_separate=is_separate,
+            )
         self.construct_modelcube(solution.best)
         return solution
 
@@ -198,7 +227,7 @@ class Tokult:
         )
 
 
-class Cube:
+class Cube(object):
     '''Contains cube data and related methods.
     '''
 
@@ -214,10 +243,14 @@ class Cube:
         self.imageplane = imageplane
         self.header = header
         self.uvplane = self.fft2(self.original, zero_padding=True)
+        self.mask_FoV = np.logical_not(np.equal(self.original, 0.0)).astype(int)
 
         self.xlim: tuple[int, int]
         self.ylim: tuple[int, int]
         self.vlim: tuple[int, int]
+        self.xslice: slice
+        self.yslice: slice
+        self.vslice: slice
         self.vgrid: np.ndarray
         self.xgrid: np.ndarray
         self.ygrid: np.ndarray
@@ -247,21 +280,23 @@ class Cube:
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
         self.uvplane = self.fft2(self.original[self.vslice, :, :], zero_padding=True)
 
-    def rms(self):
+    def rms(self, full: bool = False) -> np.ndarray:
         '''Return rms noise of the datacube.
         '''
-        maskedimage = np.copy(self.original[self.vslice, :, :])
+        if full:
+            image = self.original
+        else:
+            image = self.original[self.vslice, :, :]
+        maskedimage = np.copy(image)
         maskedimage[:, self.yslice, self.xslice] = None
-        sumsq = np.nansum(maskedimage ** 2, axis=(1, 2))
-        n = np.count_nonzero(maskedimage, axis=(1, 2))
-        return np.sqrt(sumsq / n)
+        return misc.rms(maskedimage, axis=(1, 2))
 
     def moment0(self) -> np.ndarray:
         '''Return moment 0 maps using pixel indicies.
         '''
         return np.sum(self.imageplane, axis=0)
 
-    def rms_moment0(self):
+    def rms_moment0(self) -> float:
         '''Return rms noise of the moment 0 map.
         '''
         maskedimage = self.moment0()
@@ -352,12 +387,36 @@ class Cube:
                 raise ValueError(
                     'Input cube data includes non-finite values (NaN or Inf).'
                 )
-        return fft2(data)
+        return misc.fft2(data)
 
 
 class DataCube(Cube):
     '''Cube class to contain an observed datacube.
     '''
+
+    def perturbed(
+        self,
+        rms: Union[None, float, np.ndarray] = None,
+        convolve: Optional[Callable] = None,
+        seed: Optional[int] = None,
+    ):
+        '''Return perturbed data cube.
+
+        This function is mainly for Monte Carlo simulations.
+        '''
+        rng = default_rng(seed)
+        noise = rng.standard_normal(size=self.original.shape)
+        if convolve:
+            noise = convolve(noise)
+        rms_computed = misc.rms(noise)
+
+        if rms is None:
+            rms = self.rms(full=True)
+            rms = rms[..., np.newaxis, np.newaxis]
+
+        noise *= rms / rms_computed
+        mock = self.original + noise
+        return mock
 
     @classmethod
     def create(
@@ -395,6 +454,37 @@ class ModelCube(Cube):
     '''Cube class to contain a modeled datacube.
     '''
 
+    def __init__(
+        self,
+        imageplane: np.ndarray,
+        raw: Optional[np.ndarray] = None,
+        xlim: Optional[tuple[int, int]] = None,
+        ylim: Optional[tuple[int, int]] = None,
+        vlim: Optional[tuple[int, int]] = None,
+    ) -> None:
+        super().__init__(imageplane, xlim=xlim, ylim=ylim, vlim=vlim)
+        self.raw = raw
+
+    def to_mockcube(
+        self,
+        rms_raw: float,
+        convolve: Optional[Callable] = None,
+        seed: Optional[int] = None,
+    ):
+        '''Return noisy mock data cube.
+        '''
+        if self.raw is None:
+            raise ValueError('Raw model is None.')
+
+        rng = default_rng(seed)
+        noise = rng.normal(loc=0.0, scale=rms_raw, size=self.raw.shape)
+        mock = self.raw + noise
+
+        if convolve:
+            mock = convolve(mock)
+
+        return mock
+
     @classmethod
     def create(
         cls,
@@ -424,8 +514,9 @@ class ModelCube(Cube):
             # for i, image in enumerate(modelcube):
             model_convolved = convolve(modelcube)
 
+        model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
-        return cls(model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
+        return cls(model_masked, raw=model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:
@@ -438,7 +529,7 @@ class DirtyBeam:
         self.original = beam
         self.imageplane = beam
         self.header = header
-        self.uvplane = fft2(self.original)
+        self.uvplane = misc.fft2(self.original)
 
     @classmethod
     def create(
@@ -506,7 +597,7 @@ class DirtyBeam:
         yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
         vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
         self.imageplane = self.original[vslice, yslice, xslice]
-        self.uvplane = fft2(self.original[vslice, :, :])
+        self.uvplane = misc.fft2(self.original[vslice, :, :])
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a cubic region from the dirty beam map.
