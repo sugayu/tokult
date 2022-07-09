@@ -20,6 +20,8 @@ from . import misc
 if TYPE_CHECKING:
     from .core import DataCube
 
+__all__ = ['InputParams', 'FitParamsWithUnits', 'get_bound_params']
+
 ##
 '''Global parameters used for fitting
 
