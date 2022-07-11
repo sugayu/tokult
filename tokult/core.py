@@ -105,6 +105,17 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
             )
+        elif optimization == 'mc':
+            solution = fitting.montecarlo(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                fix=fix,
+                is_separate=is_separate,
+            )
         self.construct_modelcube(solution.best)
         return solution
 
@@ -280,10 +291,10 @@ class Cube(object):
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
         self.uvplane = self.fft2(self.original[self.vslice, :, :], zero_padding=True)
 
-    def rms(self, full: bool = False) -> np.ndarray:
+    def rms(self, is_originalsize: bool = False) -> np.ndarray:
         '''Return rms noise of the datacube.
         '''
-        if full:
+        if is_originalsize:
             image = self.original
         else:
             image = self.original[self.vslice, :, :]
@@ -399,6 +410,7 @@ class DataCube(Cube):
         rms: Union[None, float, np.ndarray] = None,
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
+        is_originalsize: bool = False,
     ):
         '''Return perturbed data cube.
 
@@ -411,11 +423,13 @@ class DataCube(Cube):
         rms_computed = misc.rms(noise)
 
         if rms is None:
-            rms = self.rms(full=True)
+            rms = self.rms(is_originalsize=True)
             rms = rms[..., np.newaxis, np.newaxis]
 
         noise *= rms / rms_computed
         mock = self.original + noise
+        if not is_originalsize:
+            mock = mock[self.vslice, self.yslice, self.xslice]
         return mock
 
     @classmethod
@@ -516,7 +530,7 @@ class ModelCube(Cube):
 
         model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
-        return cls(model_masked, raw=model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
+        return cls(model_masked, raw=modelcube, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:

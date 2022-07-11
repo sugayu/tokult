@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.random import default_rng
 from scipy.optimize import least_squares as sp_least_squares
+from scipy.optimize.optimize import OptimizeResult
 from astropy.io import fits
 from astropy import units as u
 from astropy.wcs import WCS
+import tqdm
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
@@ -87,16 +89,46 @@ def least_square(
         output = sp_least_squares(calculate_chi, _init, args=args, bounds=_bound)
         _init = output.x
 
-    p_bestfit = output.x
-    dof = datacube.imageplane.size - 1 - len(init)
-    chi2 = np.sum(calculate_chi(p_bestfit, func_fit) ** 2.0)
-    J = output.jac
-    # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
-    cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
-    result_error = np.sqrt(np.diag(cov))
-    p_bestfit = restore_params(p_bestfit)
-    result_error = restore_params(result_error)
-    return Solution(p_bestfit, result_error, chi2, dof, cov)
+    dof = datacube.imageplane.size - 1 - len(_init)
+    chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)
+    return Solution.from_leastsquare(output, chi2, dof)
+
+
+def montecarlo(
+    datacube: DataCube,
+    init: Sequence[float],
+    bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+    fix: Optional[FixParams] = None,
+    func_convolve: Optional[Callable] = None,
+    func_lensing: Optional[Callable] = None,
+    mask_use: Optional[ArrayLike] = None,
+    nperturb: int = 1000,
+    niter: int = 1,
+    is_separate: bool = False,
+) -> Solution:
+    '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
+    '''
+    initialize_globalparameters_for_image(datacube, func_convolve, func_lensing)
+    func_fit = construct_convolvedmodel
+
+    set_fixedparameters(fix, is_separate)
+    bound = get_bound_params() if bound is None else bound
+    _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
+    args = (func_fit, mask_use)
+
+    params_mc = np.empty((nperturb, len(_init)))
+    for j in tqdm.tqdm(range(nperturb)):
+        __init = _init
+        global cube
+        cube = datacube.perturbed()
+        for _ in range(niter):
+            output = sp_least_squares(calculate_chi, __init, args=args, bounds=_bound)
+            __init = output.x
+        params_mc[j, :] = output.x
+
+    dof = datacube.imageplane.size - 1 - len(_init)
+    chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)
+    return Solution.from_montecarlo(params_mc, chi2, dof)
 
 
 def mcmc(
@@ -112,7 +144,8 @@ def mcmc(
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
-    nsteps: int = 100000,
+    nsteps: int = 5000,
+    nprocesses: int = 8,
 ) -> Solution:
     '''MCMC using emcee
     '''
@@ -137,7 +170,7 @@ def mcmc(
     ndim = len(_init)
     __init = np.array(_init)
     __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
-    with multiprocessing.get_context('fork').Pool(8) as pool:
+    with multiprocessing.get_context('fork').Pool(nprocesses) as pool:
         sampler = emcee.EnsembleSampler(
             nwalkers,
             ndim,
@@ -148,7 +181,8 @@ def mcmc(
         )
         sampler.run_mcmc(__init, nsteps, progress=True)
 
-    return Solution.from_sampler(sampler)
+    dof = datacube.imageplane.size - 1 - len(_init)
+    return Solution.from_sampler(sampler, dof, func_fit)
 
 
 def calculate_chi(
@@ -321,12 +355,15 @@ class Solution:
 
     def __init__(
         self,
-        p_best: list[float],
-        error: list[float],
+        p_best: Union[list[float], tuple[float, ...]],
+        error: Union[list[float], tuple[float, ...]],
         chi2: float,
         dof: float,
         cov: np.ndarray,
-        sampler: None = None,
+        mode_fitting: str,
+        sampler: Optional[emcee.EnsembleSampler] = None,
+        params_mc: Optional[np.ndarray] = None,
+        output: Optional[OptimizeResult] = None,
     ) -> None:
         self.best = InputParams(*p_best)
         self.error = InputParams(*error)
@@ -334,20 +371,63 @@ class Solution:
         self.dof = dof
         self.cov = cov
         self.sampler = sampler
+        self.params_mc = params_mc
+        self.output = output
 
     @classmethod
-    def from_sampler(cls, sampler: emcee.EnsembleSampler) -> Solution:
+    def from_leastsquare(
+        cls, output: OptimizeResult, chi2: float, dof: float
+    ) -> Solution:
+        '''Construct Solution() from output of least_square.
+        '''
+        p_bestfit = output.x
+        J = output.jac
+        # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
+        cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
+        result_error = np.sqrt(np.diag(cov))
+        p_bestfit = restore_params(p_bestfit)
+        result_error = restore_params(result_error)
+        return Solution(
+            p_bestfit, result_error, chi2, dof, cov, mode_fitting='leastsquare'
+        )
+
+    @classmethod
+    def from_sampler(
+        cls, sampler: emcee.EnsembleSampler, dof: float, func_fit: Callable
+    ) -> Solution:
         '''Construct Solution() from sampler.
         '''
-        discard = 50
-        thin = 10
+        discard = 500
+        thin = 100
         flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
 
-        best = np.percentile(flat_samples, [50], axis=0)
-        best = restore_params(best)
-        error = np.percentile(flat_samples, [84], axis=0) - best
-        error = restore_params(error)
-        return cls(best, error, 0.0, 0.0, np.array(0.0), sampler=sampler)
+        _best = np.percentile(flat_samples, [50], axis=0)
+        best = restore_params(_best)
+        _error = np.percentile(flat_samples, [84], axis=0) - _best
+        error = restore_params(_error)
+
+        chi2 = np.sum(calculate_chi(best, func_fit) ** 2.0)
+        return cls(
+            best, error, chi2, dof, np.array(0.0), mode_fitting='mcmc', sampler=sampler
+        )
+
+    @classmethod
+    def from_montecarlo(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
+        '''Construct Solution() from montecarlo perturbations.
+        '''
+        _best = np.percentile(params, [50], axis=0)
+        best = restore_params(_best)
+        _error = np.percentile(params, [84], axis=0) - _best
+        error = restore_params(_error)
+        return cls(
+            best,
+            error,
+            0.0,
+            0.0,
+            np.array(0.0),
+            params_mc=params,
+            mode_fitting='montecarlo',
+        )
 
 
 class InputParams(NamedTuple):
