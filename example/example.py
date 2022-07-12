@@ -4,35 +4,44 @@ from tokult.fitting import (
     initialize_globalparameters_for_image,
     InputParams,
 )
+from tokult.misc import fft2
 import datetime
+import numpy as np
+from astropy.io import fits
 
-tok = Tokult.launch(
-    'cube_dirty.fits',
-    'cube_dirty.psf.fits',
-    ('gamma1.fits', 'gamma2.fits', 'kappa.fits'),
-)
-tok.set_region((226, 286), (226, 286), (5, 12))
-
-print(f'Start initialguess: {datetime.datetime.now()}')
-init = tok.initialguess()
-bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265), velocity_sys=(5, 12))
-print(f'Start imagefit: {datetime.datetime.now()}')
-sol_im = tok.imagefit(init=init, bound=bound, optimization='ls')
-print(f'End imagefit: {datetime.datetime.now()}')
-
-# tok_uv = Tokult.launch(
+# tok = Tokult.launch(
 #     'cube_dirty.fits',
 #     'cube_dirty.psf.fits',
 #     ('gamma1.fits', 'gamma2.fits', 'kappa.fits'),
 # )
-# tok_uv.set_region((226, 286), (226, 286), (5, 12))
+# tok.set_region((226, 286), (226, 286), (5, 12))
 
 # print(f'Start initialguess: {datetime.datetime.now()}')
-# init = tok_uv.initialguess()
+# init = tok.initialguess()
 # bound = get_bound_params(x0_dyn=(245, 265), y0_dyn=(245, 265), velocity_sys=(5, 12))
-# print(f'Start uvfit: {datetime.datetime.now()}')
-# sol_uv = tok_uv.uvfit(init=init, bound=bound)
-# print(f'End uvfit: {datetime.datetime.now()}')
+# print(f'Start imagefit: {datetime.datetime.now()}')
+# sol_ls = tok.imagefit(init=init, bound=bound, optimization='ls')
+# # sol_im = tok.imagefit(init=sol_ls.best, bound=bound, optimization='mc')
+# print(f'End imagefit: {datetime.datetime.now()}')
+
+tok_uv = Tokult.launch(
+    'cube_dirty.fits',
+    'cube_dirty.psf.fits',
+    ('gamma1.fits', 'gamma2.fits', 'kappa.fits'),
+)
+tok_uv.set_region((226, 286), (226, 286), (5, 12))
+hudl = fits.open('cube_dirty_uniform.psf.fits')
+uvpsf_uniform = fft2(np.squeeze(hudl[0].data))
+mask = np.log10(abs(uvpsf_uniform[tok_uv.datacube.vslice, :, :])) > 0.5
+
+print(f'Start initialguess: {datetime.datetime.now()}')
+init = tok_uv.initialguess()
+bound = get_bound_params(
+    x0_dyn=(245, 265), y0_dyn=(245, 265), velocity_sys=(5, 12), mass_dyn=(-2.0, 10.0)
+)
+print(f'Start uvfit: {datetime.datetime.now()}')
+sol_uv = tok_uv.uvfit(init=init, bound=bound, mask_for_fit=mask)
+print(f'End uvfit: {datetime.datetime.now()}')
 
 # init2 = InputParams(
 #     x0_dyn=257.2535169953845,
@@ -53,11 +62,11 @@ print(f'End imagefit: {datetime.datetime.now()}')
 
 # initialize_globalparameters_for_image(tok.datacube)
 
-import corner
+# import corner
 
-sampler = sol_im.sampler
-flat_sample = sampler.get_chain(discard=2500, thin=600, flat=True)
-sample = sampler.get_chain()
-labels = sol_im.best._fields
-fig = corner.corner(flat_sample, labels=labels)
-plt.show()
+# sampler = sol_im.sampler
+# flat_sample = sampler.get_chain(discard=2500, thin=600, flat=True)
+# sample = sampler.get_chain()
+# labels = sol_im.best._fields
+# fig = corner.corner(flat_sample, labels=labels)
+# plt.show()

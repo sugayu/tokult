@@ -74,6 +74,7 @@ class Tokult:
         niter: int = 1,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
@@ -92,6 +93,7 @@ class Tokult:
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -104,6 +106,7 @@ class Tokult:
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         elif optimization == 'mc':
             solution = fitting.montecarlo(
@@ -115,6 +118,7 @@ class Tokult:
                 niter=niter,
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         self.construct_modelcube(solution.best)
         return solution
@@ -125,6 +129,7 @@ class Tokult:
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
@@ -147,6 +152,7 @@ class Tokult:
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -158,6 +164,7 @@ class Tokult:
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         self.construct_modelcube(solution.best)
         return solution
