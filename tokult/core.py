@@ -136,6 +136,7 @@ class Tokult:
         '''
         if self.dirtybeam:
             beam_visibility = self.dirtybeam.uvplane
+            norm_weight = self.calculate_normweight()
         else:
             msg = '"DirtyBeam" is necessarily for uvfit.'
             c.logger.warning(msg)
@@ -148,6 +149,7 @@ class Tokult:
                 init,
                 bound,
                 beam_vis=beam_visibility,
+                norm_weight=norm_weight,
                 func_lensing=func_lensing,
                 mode_fit='uv',
                 fix=fix,
@@ -160,6 +162,7 @@ class Tokult:
                 init,
                 bound,
                 beam_vis=beam_visibility,
+                norm_weight=norm_weight,
                 func_lensing=func_lensing,
                 mode_fit='uv',
                 fix=fix,
@@ -243,6 +246,20 @@ class Tokult:
         self.modelcube = ModelCube.create(
             params, datacube=datacube, convolve=func_convolve, lensing=func_lensing
         )
+
+    def calculate_normweight(self) -> float:
+        '''Calculate norm_weight, almost equal to sum-of-weight.
+        The obtained value is different from sum-of-weight by a factor of a few.
+        '''
+        assert self.dirtybeam is not None
+        uv = self.datacube.fft2(self.datacube.original)
+        uvpsf = misc.fft2(self.dirtybeam.original)
+        uv_noise = uv / np.sqrt(abs(uvpsf.real))
+
+        v0, v1 = self.datacube.vlim
+        n = uv_noise[[v0 - 1, v1], :, :].real
+        p = uvpsf[[v0 - 1, v1], :, :].real
+        return 1.0 / n[p > -p.min()].std() ** 2
 
 
 class Cube(object):

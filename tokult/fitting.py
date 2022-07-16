@@ -46,6 +46,7 @@ xslice: slice
 yslice: slice
 lensing: Callable = misc.no_lensing
 convolve: Callable = misc.no_convolve
+mask: np.ndarray
 mask_FoV: np.ndarray
 
 # To fix parameters in fitting
@@ -63,6 +64,7 @@ def least_square(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
+    norm_weight: Optional[float] = None,
     mask_for_fit: Optional[np.ndarray] = None,
     niter: int = 1,
     mode_fit: str = 'image',
@@ -77,9 +79,11 @@ def least_square(
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
         if beam_vis is None:
-            raise ValueError('"beam_vis" is necessarily for uvfit')
+            raise ValueError('"beam_vis" is necessary for uvfit')
+        if norm_weight is None:
+            raise ValueError('Param "norm_weight" is necessary for uvfit.')
         initialize_globalparameters_for_uv(
-            datacube, beam_vis, func_lensing, mask_for_fit
+            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
         )
         func_fit = construct_uvmodel
     else:
@@ -146,13 +150,14 @@ def mcmc(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
+    norm_weight: Optional[float] = None,
     mask_for_fit: Optional[np.ndarray] = None,
     niter: int = 1,
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
     nsteps: int = 2000,
-    nprocesses: int = 8,
+    nprocesses: int = 12,
 ) -> Solution:
     '''MCMC using emcee
     '''
@@ -165,9 +170,11 @@ def mcmc(
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
         if beam_vis is None:
-            raise ValueError('"beam_vis" is necessarily for uvfit')
+            raise ValueError('Parameter "beam_vis" is necessary for uvfit.')
+        if norm_weight is None:
+            raise ValueError('Parameter "norm_weight" is necessary for uvfit.')
         initialize_globalparameters_for_uv(
-            datacube, beam_vis, func_lensing, mask_for_fit
+            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
         )
         func_fit = construct_uvmodel
     else:
@@ -176,7 +183,7 @@ def mcmc(
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
-    args = (func_fit, _bound, mask_for_fit)
+    args = (func_fit, _bound)
 
     ndim = len(_init)
     __init = np.array(_init)
@@ -193,7 +200,7 @@ def mcmc(
         sampler.run_mcmc(__init, nsteps, progress=True)
 
     dof = datacube.imageplane.size - 1 - len(_init)
-    return Solution.from_sampler(sampler, dof, func_fit, mask_for_fit)
+    return Solution.from_sampler(sampler, dof, func_fit)
 
 
 def calculate_chi(
@@ -220,14 +227,15 @@ def calculate_log_probability(
     params: tuple[float, ...],
     model_func: Callable,
     bound: tuple[Sequence[float], Sequence[float]],
-    mask: Optional[ArrayLike] = None,
 ) -> float:
     '''Calcurate log probability for MCMC technique.
     '''
+    global mask
     log_prior = calculate_log_prior(params, bound)
     if not np.isfinite(log_prior):
         return -np.inf
-    log_likelihood = -0.5 * np.sum(abs(calculate_chi(params, model_func, mask)) ** 2)
+    chi = calculate_chi(params, model_func, mask)
+    log_likelihood = -0.5 * np.sum(abs(chi) ** 2)
     return log_prior + log_likelihood
 
 
@@ -261,10 +269,12 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     model_cutout = construct_model_at_imageplane(params)
     model_image = np.zeros(cubeshape)
     model_image[:, yslice, xslice] = model_cutout
+    # model_image = construct_model_at_imageplane(params)
     model_visibility = misc.fft2(model_image)
     # image = misc.ifft2(model_visibility * beam_visibility)
     # return misc.fft2(image * mask_FoV)
-    return model_visibility * beam_visibility
+    # return model_visibility * beam_visibility
+    return model_visibility
 
 
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
@@ -409,7 +419,7 @@ class Solution:
         sampler: emcee.EnsembleSampler,
         dof: float,
         func_fit: Callable,
-        mask_for_fit: Optional[np.ndarray] = None,
+        # mask_for_fit: Optional[np.ndarray] = None,
     ) -> Solution:
         '''Construct Solution() from sampler.
         '''
@@ -422,7 +432,8 @@ class Solution:
         _error = np.percentile(flat_samples, [84], axis=0) - _best
         error = restore_params(_error)
 
-        chi2 = np.sum(calculate_chi(best, func_fit, mask_for_fit) ** 2.0)
+        global mask
+        chi2 = np.sum(calculate_chi(best, func_fit, mask) ** 2.0)
         return cls(
             best, error, chi2, dof, np.array(0.0), mode_fitting='mcmc', sampler=sampler
         )
@@ -670,29 +681,38 @@ def initialize_globalparameters_for_image(
 def initialize_globalparameters_for_uv(
     datacube: DataCube,
     beam_vis: np.ndarray,
+    norm_weight: float,
     func_lensing: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
     global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
-    global lensing, beam_visibility, mask_FoV
+    global lensing, beam_visibility, mask_FoV, mask
 
-    cube = np.copy(datacube.uvplane)
-    cube_error = np.array(1.0)
+    size = datacube.uvplane[0, :, :].size  # constant var needed for convolution
+    cube = datacube.uvplane / beam_vis.real / size
+    cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
     cubeshape = cube.shape
+    sigma = (cube / cube_error).real
+    mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
     if mask_for_fit is not None:
-        cube_error = np.broadcast_to(cube_error, cube.shape)
-        cube = cube[mask_for_fit]
-        cube_error = cube_error[mask_for_fit]
+        mask = mask_for_fit & mask_to_remove_outlier
+    else:
+        mask = mask_to_remove_outlier
+    cube_error = np.broadcast_to(cube_error, cube.shape)
+    cube = cube[mask]
+    cube_error = cube_error[mask]
     # shape_data = datacube.uvplane.shape
     # xarray = np.arange(0, shape_data[2])
     # yarray = np.arange(0, shape_data[1])
     # varray = np.arange(datacube.vlim[0], datacube.vlim[1])
     # vv_grid, yy_grid, xx_grid = np.meshgrid(varray, yarray, xarray, indexing='ij')
+
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
     xslice, yslice = (datacube.xslice, datacube.yslice)
-    beam_visibility = beam_vis
+
+    # beam_visibility = beam_vis
     mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
