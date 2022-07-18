@@ -74,6 +74,7 @@ class Tokult:
         niter: int = 1,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
@@ -92,6 +93,7 @@ class Tokult:
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -104,6 +106,19 @@ class Tokult:
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
+            )
+        elif optimization == 'mc':
+            solution = fitting.montecarlo(
+                self.datacube,
+                init,
+                bound,
+                func_convolve=func_convolve,
+                func_lensing=func_lensing,
+                niter=niter,
+                fix=fix,
+                is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         self.construct_modelcube(solution.best)
         return solution
@@ -114,12 +129,14 @@ class Tokult:
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
         if self.dirtybeam:
             beam_visibility = self.dirtybeam.uvplane
+            norm_weight = self.calculate_normweight()
         else:
             msg = '"DirtyBeam" is necessarily for uvfit.'
             c.logger.warning(msg)
@@ -132,10 +149,12 @@ class Tokult:
                 init,
                 bound,
                 beam_vis=beam_visibility,
+                norm_weight=norm_weight,
                 func_lensing=func_lensing,
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -143,20 +162,24 @@ class Tokult:
                 init,
                 bound,
                 beam_vis=beam_visibility,
+                norm_weight=norm_weight,
                 func_lensing=func_lensing,
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
+                mask_for_fit=mask_for_fit,
             )
         self.construct_modelcube(solution.best)
         return solution
 
-    def initialguess(self) -> fitting.InputParams:
+    def initialguess(self, is_separate: bool = False) -> fitting.InputParams:
         '''Guess initial input parameters for fitting.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
-        return fitting.initialguess(self.datacube, func_convolve, func_lensing)
+        return fitting.initialguess(
+            self.datacube, func_convolve, func_lensing, is_separate
+        )
 
     def set_region(
         self,
@@ -226,6 +249,20 @@ class Tokult:
             params, datacube=datacube, convolve=func_convolve, lensing=func_lensing
         )
 
+    def calculate_normweight(self) -> float:
+        '''Calculate norm_weight, almost equal to sum-of-weight.
+        The obtained value is different from sum-of-weight by a factor of a few.
+        '''
+        assert self.dirtybeam is not None
+        uv = self.datacube.fft2(self.datacube.original)
+        uvpsf = misc.fft2(self.dirtybeam.original)
+        uv_noise = uv / np.sqrt(abs(uvpsf.real))
+
+        v0, v1 = self.datacube.vlim
+        n = uv_noise[[v0 - 1, v1], :, :].real
+        p = uvpsf[[v0 - 1, v1], :, :].real
+        return 1.0 / n[p > -p.min()].std() ** 2
+
 
 class Cube(object):
     '''Contains cube data and related methods.
@@ -280,10 +317,10 @@ class Cube(object):
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
         self.uvplane = self.fft2(self.original[self.vslice, :, :], zero_padding=True)
 
-    def rms(self, full: bool = False) -> np.ndarray:
+    def rms(self, is_originalsize: bool = False) -> np.ndarray:
         '''Return rms noise of the datacube.
         '''
-        if full:
+        if is_originalsize:
             image = self.original
         else:
             image = self.original[self.vslice, :, :]
@@ -399,6 +436,7 @@ class DataCube(Cube):
         rms: Union[None, float, np.ndarray] = None,
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
+        is_originalsize: bool = False,
     ):
         '''Return perturbed data cube.
 
@@ -411,11 +449,13 @@ class DataCube(Cube):
         rms_computed = misc.rms(noise)
 
         if rms is None:
-            rms = self.rms(full=True)
+            rms = self.rms(is_originalsize=True)
             rms = rms[..., np.newaxis, np.newaxis]
 
         noise *= rms / rms_computed
         mock = self.original + noise
+        if not is_originalsize:
+            mock = mock[self.vslice, self.yslice, self.xslice]
         return mock
 
     @classmethod
@@ -516,7 +556,7 @@ class ModelCube(Cube):
 
         model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
-        return cls(model_masked, raw=model_convolved, xlim=xlim, ylim=ylim, vlim=vlim)
+        return cls(model_masked, raw=modelcube, xlim=xlim, ylim=ylim, vlim=vlim)
 
 
 class DirtyBeam:

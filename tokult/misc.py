@@ -35,12 +35,12 @@ def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return r, phi
 
 
-def fft2(cube: np.ndarray, zero_padding: bool = False) -> np.ndarray:
+def fft2(cube: np.ndarray) -> np.ndarray:
     '''2 dimensional Fourier transform.
     '''
     shift = (np.array(cube.shape[1:]) / 2.0).astype(int)
     cube_shift = np.roll(cube, shift, axis=(1, 2))
-    uvcube = np.fft.fft2(cube_shift)
+    uvcube = np.fft.fft2(cube_shift, norm='forward')
     uvcube = np.fft.fftshift(uvcube, axes=(1, 2))
     return uvcube
 
@@ -49,7 +49,7 @@ def ifft2(uvcube: np.ndarray) -> np.ndarray:
     '''Inverse 2 dimensional Fourier transform.
     '''
     cube_shift = np.fft.ifftshift(uvcube, axes=(1, 2))
-    cube_shift = np.fft.ifft2(cube_shift)
+    cube_shift = np.fft.ifft2(cube_shift, norm='forward')
     shift = -(np.array(cube_shift.shape[1:]) / 2.0).astype(int)
     cube = np.roll(cube_shift, shift, axis=(1, 2))
     return cube

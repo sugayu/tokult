@@ -7,6 +7,7 @@ skip-string-normalization = true
 module = [
        'scipy.*',
        'astropy.*',
-       'emcee.*'
+       'emcee.*',
+       'tqdm'
 ]
 ignore_missing_imports = true

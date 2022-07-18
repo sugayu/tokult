@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.random import default_rng
 from scipy.optimize import least_squares as sp_least_squares
+from scipy.optimize.optimize import OptimizeResult
 from astropy.io import fits
 from astropy import units as u
 from astropy.wcs import WCS
+import tqdm
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 from numpy.typing import ArrayLike
@@ -35,6 +37,7 @@ lensing: a function to convert source plane to image plane. Method of GravLens.
 
 cube: np.ndarray
 cube_error: np.ndarray
+cubeshape: tuple[int, ...]
 beam_visibility: np.ndarray
 xx_grid: np.ndarray
 yy_grid: np.ndarray
@@ -43,6 +46,7 @@ xslice: slice
 yslice: slice
 lensing: Callable = misc.no_lensing
 convolve: Callable = misc.no_convolve
+mask: np.ndarray
 mask_FoV: np.ndarray
 
 # To fix parameters in fitting
@@ -60,7 +64,8 @@ def least_square(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
-    mask_use: Optional[ArrayLike] = None,
+    norm_weight: Optional[float] = None,
+    mask_for_fit: Optional[np.ndarray] = None,
     niter: int = 1,
     mode_fit: str = 'image',
     is_separate: bool = False,
@@ -68,12 +73,18 @@ def least_square(
     '''Least square fitting using scipy.optimize.least_squares
     '''
     if mode_fit == 'image':
-        initialize_globalparameters_for_image(datacube, func_convolve, func_lensing)
+        initialize_globalparameters_for_image(
+            datacube, func_convolve, func_lensing, mask_for_fit
+        )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
         if beam_vis is None:
-            raise ValueError('"beam_vis" is necessarily for uvfit')
-        initialize_globalparameters_for_uv(datacube, beam_vis, func_lensing)
+            raise ValueError('"beam_vis" is necessary for uvfit')
+        if norm_weight is None:
+            raise ValueError('Param "norm_weight" is necessary for uvfit.')
+        initialize_globalparameters_for_uv(
+            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
+        )
         func_fit = construct_uvmodel
     else:
         raise ValueError(f'mode_fit is "image" or "uv", no option for "{mode_fit}".')
@@ -81,22 +92,54 @@ def least_square(
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
-    args = (func_fit, mask_use)
+    args = (func_fit, mask_for_fit)
 
     for _ in range(niter):
         output = sp_least_squares(calculate_chi, _init, args=args, bounds=_bound)
         _init = output.x
 
-    p_bestfit = output.x
-    dof = datacube.imageplane.size - 1 - len(init)
-    chi2 = np.sum(calculate_chi(p_bestfit, func_fit) ** 2.0)
-    J = output.jac
-    # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
-    cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
-    result_error = np.sqrt(np.diag(cov))
-    p_bestfit = restore_params(p_bestfit)
-    result_error = restore_params(result_error)
-    return Solution(p_bestfit, result_error, chi2, dof, cov)
+    dof = datacube.imageplane.size - 1 - len(_init)
+    chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)
+    return Solution.from_leastsquare(output, chi2, dof)
+
+
+def montecarlo(
+    datacube: DataCube,
+    init: Sequence[float],
+    bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+    fix: Optional[FixParams] = None,
+    func_convolve: Optional[Callable] = None,
+    func_lensing: Optional[Callable] = None,
+    mask_for_fit: Optional[np.ndarray] = None,
+    nperturb: int = 1000,
+    niter: int = 1,
+    is_separate: bool = False,
+) -> Solution:
+    '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
+    '''
+    initialize_globalparameters_for_image(
+        datacube, func_convolve, func_lensing, mask_for_fit
+    )
+    func_fit = construct_convolvedmodel
+
+    set_fixedparameters(fix, is_separate)
+    bound = get_bound_params() if bound is None else bound
+    _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
+    args = (func_fit, mask_for_fit)
+
+    params_mc = np.empty((nperturb, len(_init)))
+    for j in tqdm.tqdm(range(nperturb)):
+        _init_j = _init
+        global cube
+        cube = datacube.perturbed()
+        for _ in range(niter):
+            output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
+            _init_j = output.x
+        params_mc[j, :] = output.x
+
+    dof = datacube.imageplane.size - 1 - len(_init)
+    chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)
+    return Solution.from_montecarlo(params_mc, chi2, dof)
 
 
 def mcmc(
@@ -107,24 +150,32 @@ def mcmc(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
-    mask_use: Optional[ArrayLike] = None,
+    norm_weight: Optional[float] = None,
+    mask_for_fit: Optional[np.ndarray] = None,
     niter: int = 1,
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
-    nsteps: int = 100000,
+    nsteps: int = 5000,
+    nprocesses: int = 12,
 ) -> Solution:
     '''MCMC using emcee
     '''
     rng = default_rng(222)
 
     if mode_fit == 'image':
-        initialize_globalparameters_for_image(datacube, func_convolve, func_lensing)
+        initialize_globalparameters_for_image(
+            datacube, func_convolve, func_lensing, mask_for_fit
+        )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
         if beam_vis is None:
-            raise ValueError('"beam_vis" is necessarily for uvfit')
-        initialize_globalparameters_for_uv(datacube, beam_vis, func_lensing)
+            raise ValueError('Parameter "beam_vis" is necessary for uvfit.')
+        if norm_weight is None:
+            raise ValueError('Parameter "norm_weight" is necessary for uvfit.')
+        initialize_globalparameters_for_uv(
+            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
+        )
         func_fit = construct_uvmodel
     else:
         raise ValueError(f'mode_fit is "image" or "uv", no option for "{mode_fit}".')
@@ -132,12 +183,12 @@ def mcmc(
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
-    args = (func_fit, _bound, mask_use)
+    args = (func_fit, _bound)
 
     ndim = len(_init)
     __init = np.array(_init)
     __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
-    with multiprocessing.get_context('fork').Pool(8) as pool:
+    with multiprocessing.get_context('fork').Pool(nprocesses) as pool:
         sampler = emcee.EnsembleSampler(
             nwalkers,
             ndim,
@@ -148,7 +199,8 @@ def mcmc(
         )
         sampler.run_mcmc(__init, nsteps, progress=True)
 
-    return Solution.from_sampler(sampler)
+    dof = datacube.imageplane.size - 1 - len(_init)
+    return Solution.from_sampler(sampler, dof, func_fit)
 
 
 def calculate_chi(
@@ -167,7 +219,7 @@ def calculate_chi(
         # iy = (y - ylow).astype(int)
         # model_last = model[iy, ix, iv]
 
-    chi = abs(cube - model) / cube_error
+    chi = (cube - model) / cube_error
     return chi.ravel()
 
 
@@ -175,14 +227,15 @@ def calculate_log_probability(
     params: tuple[float, ...],
     model_func: Callable,
     bound: tuple[Sequence[float], Sequence[float]],
-    index: Optional[ArrayLike] = None,
 ) -> float:
     '''Calcurate log probability for MCMC technique.
     '''
+    global mask
     log_prior = calculate_log_prior(params, bound)
     if not np.isfinite(log_prior):
         return -np.inf
-    log_likelihood = -0.5 * np.sum(calculate_chi(params, model_func, index))
+    chi = calculate_chi(params, model_func, mask)
+    log_likelihood = -0.5 * np.sum(abs(chi) ** 2)
     return log_prior + log_likelihood
 
 
@@ -212,13 +265,16 @@ def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
-    global cube, yslice, xslice, beam_visibility, mask_FoV
+    global cube, cubeshape, yslice, xslice, beam_visibility, mask_FoV
     model_cutout = construct_model_at_imageplane(params)
-    model_image = np.zeros_like(cube)
+    model_image = np.zeros(cubeshape)
     model_image[:, yslice, xslice] = model_cutout
+    # model_image = construct_model_at_imageplane(params)
     model_visibility = misc.fft2(model_image)
-    image = misc.ifft2(model_visibility * beam_visibility)
-    return misc.fft2(image * mask_FoV)
+    # image = misc.ifft2(model_visibility * beam_visibility)
+    # return misc.fft2(image * mask_FoV)
+    # return model_visibility * beam_visibility
+    return model_visibility
 
 
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
@@ -321,12 +377,15 @@ class Solution:
 
     def __init__(
         self,
-        p_best: list[float],
-        error: list[float],
+        p_best: Union[list[float], tuple[float, ...]],
+        error: Union[list[float], tuple[float, ...]],
         chi2: float,
         dof: float,
         cov: np.ndarray,
-        sampler: None = None,
+        mode_fitting: str,
+        sampler: Optional[emcee.EnsembleSampler] = None,
+        params_mc: Optional[np.ndarray] = None,
+        output: Optional[OptimizeResult] = None,
     ) -> None:
         self.best = InputParams(*p_best)
         self.error = InputParams(*error)
@@ -334,20 +393,68 @@ class Solution:
         self.dof = dof
         self.cov = cov
         self.sampler = sampler
+        self.params_mc = params_mc
+        self.output = output
 
     @classmethod
-    def from_sampler(cls, sampler: emcee.EnsembleSampler) -> Solution:
+    def from_leastsquare(
+        cls, output: OptimizeResult, chi2: float, dof: float
+    ) -> Solution:
+        '''Construct Solution() from output of least_square.
+        '''
+        p_bestfit = output.x
+        J = output.jac
+        # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
+        cov = np.linalg.inv(J.T.dot(J))  # * (residuals_lsq**2).mean()
+        result_error = np.sqrt(np.diag(cov))
+        p_bestfit = restore_params(p_bestfit)
+        result_error = restore_params(result_error)
+        return Solution(
+            p_bestfit, result_error, chi2, dof, cov, mode_fitting='leastsquare'
+        )
+
+    @classmethod
+    def from_sampler(
+        cls,
+        sampler: emcee.EnsembleSampler,
+        dof: float,
+        func_fit: Callable,
+        # mask_for_fit: Optional[np.ndarray] = None,
+    ) -> Solution:
         '''Construct Solution() from sampler.
         '''
-        discard = 50
-        thin = 10
+        discard = 5
+        thin = 1
         flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
 
-        best = np.percentile(flat_samples, [50], axis=0)
-        best = restore_params(best)
-        error = np.percentile(flat_samples, [84], axis=0) - best
-        error = restore_params(error)
-        return cls(best, error, 0.0, 0.0, np.array(0.0), sampler=sampler)
+        _best = np.percentile(flat_samples, [50], axis=0)
+        best = restore_params(_best)
+        _error = np.percentile(flat_samples, [84], axis=0) - _best
+        error = restore_params(_error)
+
+        global mask
+        chi2 = np.sum(calculate_chi(best, func_fit, mask) ** 2.0)
+        return cls(
+            best, error, chi2, dof, np.array(0.0), mode_fitting='mcmc', sampler=sampler
+        )
+
+    @classmethod
+    def from_montecarlo(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
+        '''Construct Solution() from montecarlo perturbations.
+        '''
+        _best = np.percentile(params, [50], axis=0)
+        best = restore_params(_best)
+        _error = np.percentile(params, [84], axis=0) - _best
+        error = restore_params(_error)
+        return cls(
+            best,
+            error,
+            0.0,
+            0.0,
+            np.array(0.0),
+            params_mc=params,
+            mode_fitting='montecarlo',
+        )
 
 
 class InputParams(NamedTuple):
@@ -548,6 +655,7 @@ def initialize_globalparameters_for_image(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
+    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the image plane.
     '''
@@ -557,6 +665,10 @@ def initialize_globalparameters_for_image(
     cube = np.copy(datacube.imageplane)
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
+    if mask_for_fit is not None:
+        cube = cube[mask_for_fit]
+        cube_error = np.broadcast_to(cube_error, cube.shape)
+        cube_error = cube_error[mask_for_fit]
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
@@ -567,23 +679,40 @@ def initialize_globalparameters_for_image(
 
 
 def initialize_globalparameters_for_uv(
-    datacube: DataCube, beam_vis: np.ndarray, func_lensing: Optional[Callable] = None,
+    datacube: DataCube,
+    beam_vis: np.ndarray,
+    norm_weight: float,
+    func_lensing: Optional[Callable] = None,
+    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
-    global cube, cube_error, xx_grid, yy_grid, vv_grid, xslice, yslice
-    global lensing, beam_visibility, mask_FoV
+    global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
+    global lensing, beam_visibility, mask_FoV, mask
 
-    cube = np.copy(datacube.uvplane)
-    cube_error = np.array(1.0)
+    size = datacube.uvplane[0, :, :].size  # constant var needed for convolution
+    cube = datacube.uvplane / beam_vis.real / size
+    cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
+    cubeshape = cube.shape
+    sigma = (cube / cube_error).real
+    mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
+    if mask_for_fit is not None:
+        mask = mask_for_fit & mask_to_remove_outlier
+    else:
+        mask = mask_to_remove_outlier
+    cube_error = np.broadcast_to(cube_error, cube.shape)
+    cube = cube[mask]
+    cube_error = cube_error[mask]
     # shape_data = datacube.uvplane.shape
     # xarray = np.arange(0, shape_data[2])
     # yarray = np.arange(0, shape_data[1])
     # varray = np.arange(datacube.vlim[0], datacube.vlim[1])
     # vv_grid, yy_grid, xx_grid = np.meshgrid(varray, yarray, xarray, indexing='ij')
+
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
     xslice, yslice = (datacube.xslice, datacube.yslice)
-    beam_visibility = beam_vis
+
+    # beam_visibility = beam_vis
     mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
@@ -691,6 +820,7 @@ def initialguess(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    is_separate: bool = False,
 ) -> InputParams:
     '''Guess initial parameters by fitting moment 0 and 1 maps.
     '''
@@ -701,6 +831,13 @@ def initialguess(
     init = [p[3], p[4], 1.0, vcen, p[2], p[0], p[1]]
 
     param1 = least_square_moment1(datacube, init, func_convolve, func_lensing)
+
+    if not is_separate:
+        param1[5] = param0[0]
+        param1[6] = param0[1]
+        param1[4] = param0[2]
+        param1[0] = param0[3]
+        param1[1] = param0[4]
 
     return InputParams(
         x0_dyn=param1[5],
@@ -734,7 +871,8 @@ def least_square_moment0(
     func_fit = construct_model_moment0
 
     x0, y0 = datacube.xgrid.mean(), datacube.ygrid.mean()
-    init = (x0, y0, np.pi / 2, np.pi / 4, 1.0, 3.0)
+    brightness0 = datacube.moment0().max()
+    init = (x0, y0, np.pi / 2, np.pi / 4, 1.0, brightness0)
     bound = (
         (-np.inf, -np.inf, 0, 0, 0, 0),
         (np.inf, np.inf, np.pi, 0.5 * np.pi, np.inf, np.inf),
