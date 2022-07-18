@@ -72,10 +72,14 @@ class Tokult:
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         niter: int = 1,
+        nperturb: int = 1000,
         fix: Optional[fitting.FixParams] = None,
         is_separate: bool = False,
         mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
+        nwalkers: int = 64,
+        nsteps: int = 5000,
+        nprocesses: int = 12,
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
@@ -89,11 +93,13 @@ class Tokult:
                 bound,
                 func_convolve=func_convolve,
                 func_lensing=func_lensing,
-                niter=niter,
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                nwalkers=nwalkers,
+                nsteps=nsteps,
+                nprocesses=nprocesses,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -116,6 +122,7 @@ class Tokult:
                 func_convolve=func_convolve,
                 func_lensing=func_lensing,
                 niter=niter,
+                nperturb=nperturb,
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
@@ -128,9 +135,13 @@ class Tokult:
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
+        niter: int = 1,
         is_separate: bool = False,
         mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
+        nwalkers: int = 64,
+        nsteps: int = 5000,
+        nprocesses: int = 12,
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
@@ -155,6 +166,9 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                nwalkers=nwalkers,
+                nsteps=nsteps,
+                nprocesses=nprocesses,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -168,6 +182,7 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                niter=niter,
             )
         self.construct_modelcube(solution.best)
         return solution

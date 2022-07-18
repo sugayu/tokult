@@ -38,7 +38,6 @@ lensing: a function to convert source plane to image plane. Method of GravLens.
 cube: np.ndarray
 cube_error: np.ndarray
 cubeshape: tuple[int, ...]
-beam_visibility: np.ndarray
 xx_grid: np.ndarray
 yy_grid: np.ndarray
 vv_grid: np.ndarray
@@ -46,7 +45,7 @@ xslice: slice
 yslice: slice
 lensing: Callable = misc.no_lensing
 convolve: Callable = misc.no_convolve
-mask: np.ndarray
+mask: Optional[np.ndarray] = None
 mask_FoV: np.ndarray
 
 # To fix parameters in fitting
@@ -92,7 +91,7 @@ def least_square(
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
-    args = (func_fit, mask_for_fit)
+    args = (func_fit,)
 
     for _ in range(niter):
         output = sp_least_squares(calculate_chi, _init, args=args, bounds=_bound)
@@ -125,10 +124,10 @@ def montecarlo(
     set_fixedparameters(fix, is_separate)
     bound = get_bound_params() if bound is None else bound
     _init, _bound = shorten_init_and_bound_ifneeded(init, bound)
-    args = (func_fit, mask_for_fit)
+    args = (func_fit,)
 
     params_mc = np.empty((nperturb, len(_init)))
-    for j in tqdm.tqdm(range(nperturb)):
+    for j in tqdm.tqdm(range(nperturb), leave=None):
         _init_j = _init
         global cube
         cube = datacube.perturbed()
@@ -152,7 +151,6 @@ def mcmc(
     beam_vis: Optional[np.ndarray] = None,
     norm_weight: Optional[float] = None,
     mask_for_fit: Optional[np.ndarray] = None,
-    niter: int = 1,
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
@@ -203,14 +201,13 @@ def mcmc(
     return Solution.from_sampler(sampler, dof, func_fit)
 
 
-def calculate_chi(
-    params: tuple[float, ...], model_func: Callable, index: Optional[ArrayLike] = None,
-) -> np.ndarray:
+def calculate_chi(params: tuple[float, ...], model_func: Callable,) -> np.ndarray:
     '''Calcurate chi = (data-model)/error for least square fitting
     '''
+    global mask
     model = model_func(params)
-    if index is not None:
-        model = model[index]
+    if mask is not None:
+        model = model[mask]
 
         # # Choose fitting region via indices.
         # iv = (v - dv * c.conf.chan_start - vel_start) / dv
@@ -230,11 +227,10 @@ def calculate_log_probability(
 ) -> float:
     '''Calcurate log probability for MCMC technique.
     '''
-    global mask
     log_prior = calculate_log_prior(params, bound)
     if not np.isfinite(log_prior):
         return -np.inf
-    chi = calculate_chi(params, model_func, mask)
+    chi = calculate_chi(params, model_func)
     log_likelihood = -0.5 * np.sum(abs(chi) ** 2)
     return log_prior + log_likelihood
 
@@ -432,8 +428,7 @@ class Solution:
         _error = np.percentile(flat_samples, [84], axis=0) - _best
         error = restore_params(_error)
 
-        global mask
-        chi2 = np.sum(calculate_chi(best, func_fit, mask) ** 2.0)
+        chi2 = np.sum(calculate_chi(best, func_fit) ** 2.0)
         return cls(
             best, error, chi2, dof, np.array(0.0), mode_fitting='mcmc', sampler=sampler
         )
@@ -660,12 +655,13 @@ def initialize_globalparameters_for_image(
     '''Set global parameters used in fitting.py in the image plane.
     '''
     global cube, cube_error, xx_grid, yy_grid, vv_grid
-    global lensing, convolve
+    global lensing, convolve, mask
 
     cube = np.copy(datacube.imageplane)
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
     if mask_for_fit is not None:
+        mask = mask_for_fit
         cube = cube[mask_for_fit]
         cube_error = np.broadcast_to(cube_error, cube.shape)
         cube_error = cube_error[mask_for_fit]
