@@ -172,12 +172,14 @@ class Tokult:
         self.construct_modelcube(solution.best)
         return solution
 
-    def initialguess(self) -> fitting.InputParams:
+    def initialguess(self, is_separate: bool = False) -> fitting.InputParams:
         '''Guess initial input parameters for fitting.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
-        return fitting.initialguess(self.datacube, func_convolve, func_lensing)
+        return fitting.initialguess(
+            self.datacube, func_convolve, func_lensing, is_separate
+        )
 
     def set_region(
         self,

@@ -156,7 +156,7 @@ def mcmc(
     mode_fit: str = 'image',
     is_separate: bool = False,
     nwalkers: int = 64,
-    nsteps: int = 2000,
+    nsteps: int = 5000,
     nprocesses: int = 12,
 ) -> Solution:
     '''MCMC using emcee
@@ -820,6 +820,7 @@ def initialguess(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    is_separate: bool = False,
 ) -> InputParams:
     '''Guess initial parameters by fitting moment 0 and 1 maps.
     '''
@@ -830,6 +831,13 @@ def initialguess(
     init = [p[3], p[4], 1.0, vcen, p[2], p[0], p[1]]
 
     param1 = least_square_moment1(datacube, init, func_convolve, func_lensing)
+
+    if not is_separate:
+        param1[5] = param0[0]
+        param1[6] = param0[1]
+        param1[4] = param0[2]
+        param1[0] = param0[3]
+        param1[1] = param0[4]
 
     return InputParams(
         x0_dyn=param1[5],
@@ -863,7 +871,8 @@ def least_square_moment0(
     func_fit = construct_model_moment0
 
     x0, y0 = datacube.xgrid.mean(), datacube.ygrid.mean()
-    init = (x0, y0, np.pi / 2, np.pi / 4, 1.0, 3.0)
+    brightness0 = datacube.moment0().max()
+    init = (x0, y0, np.pi / 2, np.pi / 4, 1.0, brightness0)
     bound = (
         (-np.inf, -np.inf, 0, 0, 0, 0),
         (np.inf, np.inf, np.pi, 0.5 * np.pi, np.inf, np.inf),
