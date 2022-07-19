@@ -108,6 +108,7 @@ def montecarlo(
     bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
     fix: Optional[FixParams] = None,
     func_convolve: Optional[Callable] = None,
+    func_fullconvolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
     nperturb: int = 1000,
@@ -130,7 +131,7 @@ def montecarlo(
     for j in tqdm.tqdm(range(nperturb), leave=None):
         _init_j = _init
         global cube
-        cube = datacube.perturbed()
+        cube = datacube.perturbed(convolve=func_fullconvolve)
         for _ in range(niter):
             output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
             _init_j = output.x

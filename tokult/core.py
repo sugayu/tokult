@@ -115,11 +115,13 @@ class Tokult:
                 mask_for_fit=mask_for_fit,
             )
         elif optimization == 'mc':
+            func_fullconvolve = self.dirtybeam.fullconvolve if self.dirtybeam else None
             solution = fitting.montecarlo(
                 self.datacube,
                 init,
                 bound,
                 func_convolve=func_convolve,
+                func_fullconvolve=func_fullconvolve,
                 func_lensing=func_lensing,
                 niter=niter,
                 nperturb=nperturb,
@@ -428,6 +430,22 @@ class Cube(object):
         c.logger.error(message)
         raise ValueError(message)
 
+    def noisy(
+        self,
+        rms: Union[float, np.ndarray],
+        convolve: Optional[Callable] = None,
+        seed: Optional[int] = None,
+        is_originalsize: bool = False,
+        uvcoverage: Optional[np.ndarray] = None,
+    ):
+        '''Return noisy mock data cube.
+        '''
+        noise = self.create_noise(rms, self.original.shape, convolve, seed, uvcoverage)
+        mock = self.original + noise
+        if not is_originalsize:
+            mock = mock[self.vslice, self.yslice, self.xslice]
+        return mock
+
     @staticmethod
     def fft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
         '''Wrapper of misc.fft2.
@@ -441,6 +459,22 @@ class Cube(object):
                 )
         return misc.fft2(data)
 
+    @staticmethod
+    def create_noise(
+        rms: Union[float, np.ndarray],
+        shape: tuple[int, ...],
+        convolve: Optional[Callable] = None,
+        seed: Optional[int] = None,
+        uvcoverage: Optional[np.ndarray] = None,
+    ):
+        rng = default_rng(seed)
+        noise = rng.standard_normal(size=shape)
+        if convolve:
+            noise = convolve(noise, uvcoverage=uvcoverage, is_noise=True)
+        rms_computed = misc.rms(noise)
+        noise *= rms / rms_computed
+        return noise
+
 
 class DataCube(Cube):
     '''Cube class to contain an observed datacube.
@@ -448,30 +482,18 @@ class DataCube(Cube):
 
     def perturbed(
         self,
-        rms: Union[None, float, np.ndarray] = None,
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
         is_originalsize: bool = False,
+        uvcoverage: Optional[np.ndarray] = None,
     ):
         '''Return perturbed data cube.
 
         This function is mainly for Monte Carlo simulations.
         '''
-        rng = default_rng(seed)
-        noise = rng.standard_normal(size=self.original.shape)
-        if convolve:
-            noise = convolve(noise)
-        rms_computed = misc.rms(noise)
-
-        if rms is None:
-            rms = self.rms(is_originalsize=True)
-            rms = rms[..., np.newaxis, np.newaxis]
-
-        noise *= rms / rms_computed
-        mock = self.original + noise
-        if not is_originalsize:
-            mock = mock[self.vslice, self.yslice, self.xslice]
-        return mock
+        rms = self.rms(is_originalsize=True)
+        rms = rms[..., np.newaxis, np.newaxis]
+        return self.noisy(rms, convolve, seed, is_originalsize, uvcoverage)
 
     @classmethod
     def create(
@@ -520,26 +542,6 @@ class ModelCube(Cube):
         super().__init__(imageplane, xlim=xlim, ylim=ylim, vlim=vlim)
         self.raw = raw
 
-    def to_mockcube(
-        self,
-        rms_raw: float,
-        convolve: Optional[Callable] = None,
-        seed: Optional[int] = None,
-    ):
-        '''Return noisy mock data cube.
-        '''
-        if self.raw is None:
-            raise ValueError('Raw model is None.')
-
-        rng = default_rng(seed)
-        noise = rng.normal(loc=0.0, scale=rms_raw, size=self.raw.shape)
-        mock = self.raw + noise
-
-        if convolve:
-            mock = convolve(mock)
-
-        return mock
-
     @classmethod
     def create(
         cls,
@@ -572,6 +574,26 @@ class ModelCube(Cube):
         model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
         return cls(model_masked, raw=modelcube, xlim=xlim, ylim=ylim, vlim=vlim)
+
+    def to_mockcube(
+        self,
+        rms: Union[float, np.ndarray],
+        convolve: Optional[Callable] = None,
+        seed: Optional[int] = None,
+        is_originalsize: bool = False,
+        uvcoverage: Optional[np.ndarray] = None,
+    ):
+        '''Return noisy mock data cube.
+        '''
+        if self.raw is None:
+            raise ValueError('Raw model is None.')
+
+        model = convolve(self.raw, uvcoverage=uvcoverage) if convolve else self.raw
+        noise = self.create_noise(rms, self.raw.shape, convolve, seed, uvcoverage)
+        mock = model + noise
+        if not is_originalsize:
+            mock = mock[self.vslice, self.yslice, self.xslice]
+        return mock
 
 
 class DirtyBeam:
@@ -628,15 +650,28 @@ class DirtyBeam:
         else:
             raise ValueError(f'dimension of image is two or three, not {dim}.')
 
-    def fullconvolve(self, image: np.ndarray) -> np.ndarray:
+    def fullconvolve(
+        self,
+        image: np.ndarray,
+        uvcoverage: Optional[np.ndarray] = None,
+        is_noise: bool = False,
+    ) -> np.ndarray:
         '''Convolve image with original-size dirtybeam (psf).
         '''
         kernel = self.original
         dim = len(image.shape)
         if len(image.shape) == 2:
-            return fftconvolve(image, kernel[0, :, :], mode='same')
+            if is_noise:
+                return misc.fftconvolve_noise(
+                    image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
+                )
+            else:
+                return fftconvolve(image, kernel[0, :, :], mode='same')
         elif len(image.shape) == 3:
-            return fftconvolve(image, kernel, mode='same', axes=(1, 2))
+            if is_noise:
+                return misc.fftconvolve_noise(image, kernel, uvcoverage)
+            else:
+                return fftconvolve(image, kernel, mode='same', axes=(1, 2))
         else:
             raise ValueError(f'dimension of image is two or three, not {dim}.')
 

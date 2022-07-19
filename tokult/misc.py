@@ -55,6 +55,24 @@ def ifft2(uvcube: np.ndarray) -> np.ndarray:
     return cube
 
 
+def fftconvolve_noise(
+    noise: np.ndarray, kernel: np.ndarray, uvcoverage: Optional[np.ndarray] = None
+) -> np.ndarray:
+    '''Convolve noise like scipy.signal.fftconvolve after modifying kernel.
+
+    Convolution kernel for sky images and noises is different.
+    '''
+    size = noise[0, :, :].size
+    uv = fft2(noise)
+    uvpsf = fft2(kernel)
+    uv_noise = size * uv * np.sqrt(abs(uvpsf.real))
+
+    if uvcoverage is not None:
+        uv_noise[np.logical_not(uvcoverage)] = 0.0
+
+    return ifft2(uv_noise).real
+
+
 def no_lensing(coordinate: np.ndarray) -> np.ndarray:
     '''Dummy function. Return coordinate as itself without lensing.
     '''
