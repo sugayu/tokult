@@ -3,7 +3,6 @@
 from __future__ import annotations
 import numpy as np
 from numpy.random import default_rng
-from scipy.signal import fftconvolve
 from astropy.io import fits
 from astropy import wcs
 from typing import Callable, Sequence, Optional, Union
@@ -644,9 +643,9 @@ class DirtyBeam:
         # kernel = beam  / np.sum(beam)
         dim = len(image.shape)
         if dim == 2:
-            return fftconvolve(image, kernel[0, :, :], mode='same')
+            return misc.fftconvolve(image[np.newaxis, :, :], kernel[[0], :, :])
         elif dim == 3:
-            return fftconvolve(image, kernel, mode='same', axes=(1, 2))
+            return misc.fftconvolve(image, kernel)
         else:
             raise ValueError(f'dimension of image is two or three, not {dim}.')
 
@@ -666,12 +665,12 @@ class DirtyBeam:
                     image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
                 )
             else:
-                return fftconvolve(image, kernel[0, :, :], mode='same')
+                return misc.fftconvolve(image[np.newaxis, :, :], kernel[[0], :, :])
         elif len(image.shape) == 3:
             if is_noise:
                 return misc.fftconvolve_noise(image, kernel, uvcoverage)
             else:
-                return fftconvolve(image, kernel, mode='same', axes=(1, 2))
+                return misc.fftconvolve(image, kernel)
         else:
             raise ValueError(f'dimension of image is two or three, not {dim}.')
 
