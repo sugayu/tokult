@@ -29,12 +29,11 @@ def freeman_disk(
     '''
     r2h = 0.5 * r / rnorm
     myu_0 = mass_dyn / (2 * np.pi * rnorm ** 2)
-    G = 1
 
-    I0 = sps.iv(0, r2h)
-    K0 = sps.kv(0, r2h)
-    I1 = sps.iv(1, r2h)
-    K1 = sps.kv(1, r2h)
+    I0 = sps.i0(r2h)
+    K0 = sps.k0(r2h)
+    I1 = sps.i1(r2h)
+    K1 = sps.k1(r2h)
     if np.any(idx := np.logical_not(np.isfinite(K0))):
         # K0 and K1 become inf at r=0
         K0[idx] = 0.0
@@ -48,5 +47,5 @@ def freeman_disk(
         A[idx] = 0.0
     f_sightline = np.cos(phi) * np.sin(incl)
 
-    velocity = np.sqrt(4 * np.pi * G * myu_0 * rnorm * r2h ** 2 * A) * f_sightline
+    velocity = np.sqrt(4 * np.pi * myu_0 * rnorm * r2h ** 2 * A) * f_sightline
     return velocity

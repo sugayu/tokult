@@ -731,6 +731,7 @@ class GravLens:
         self.gamma2 = gamma2
         self.kappa = kappa
         self.header = header
+        self.jacob = self.get_jacob()
 
     @classmethod
     def create(
@@ -788,6 +789,11 @@ class GravLens:
         coordinates -- position array including (x, y).
                        shape: (n, m, 2) and shape of x: (n, m)
         '''
+        return np.squeeze(self.jacob @ coordinates[..., np.newaxis])
+
+    def get_jacob(self):
+        '''Get jacobian
+        '''
         g1 = self.gamma1
         g2 = self.gamma2
         k = self.kappa
@@ -797,8 +803,7 @@ class GravLens:
         # assert axis == np.array([2, 3, 0, 1])
         jacob = jacob.transpose(axis)
         # assert jacob.shape == (n, m, 2, 2)
-        _coord = coordinates[..., np.newaxis]
-        return np.squeeze(jacob @ _coord)
+        return jacob
 
     def match_wcs_with(self, cube: DataCube):
         '''Match the world coordinate system with input data.
@@ -813,6 +818,7 @@ class GravLens:
         self.gamma1 = self.original_gamma1[idx].reshape(*shape)
         self.gamma2 = self.original_gamma2[idx].reshape(*shape)
         self.kappa = self.original_kappa[idx].reshape(*shape)
+        self.jacob = self.get_jacob()
 
     @staticmethod
     def loadfits(
