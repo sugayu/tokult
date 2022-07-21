@@ -377,7 +377,8 @@ class Solution:
     def __init__(
         self,
         p_best: Union[list[float], tuple[float, ...]],
-        error: Union[list[float], tuple[float, ...]],
+        error_high: Union[list[float], tuple[float, ...]],
+        error_low: Union[list[float], tuple[float, ...]],
         chi2: float,
         dof: float,
         cov: np.ndarray,
@@ -387,7 +388,8 @@ class Solution:
         output: Optional[OptimizeResult] = None,
     ) -> None:
         self.best = InputParams(*p_best)
-        self.error = InputParams(*error)
+        self.error_high = InputParams(*error_high)
+        self.error_low = InputParams(*error_low)
         self.chi2 = chi2
         self.dof = dof
         self.cov = cov
@@ -409,7 +411,13 @@ class Solution:
         p_bestfit = restore_params(p_bestfit)
         result_error = restore_params(result_error)
         return Solution(
-            p_bestfit, result_error, chi2, dof, cov, mode_fitting='leastsquare'
+            p_bestfit,
+            result_error,
+            result_error,
+            chi2,
+            dof,
+            cov,
+            mode_fitting='leastsquare',
         )
 
     @classmethod
@@ -422,31 +430,46 @@ class Solution:
     ) -> Solution:
         '''Construct Solution() from sampler.
         '''
-        discard = 5
-        thin = 1
-        flat_samples = sampler.get_chain(discard=discard, thin=thin, flat=True)
+        try:
+            tau = sampler.get_autocorr_time()
+            burnin = int(np.max(tau) * 2.0)
+            thin = int(np.min(tau) * 2.0)
+        except emcee.autocorr.AutocorrError:
+            # HACK: these estimates may be wrong.
+            shape = sampler.get_chain(discard=0, thin=1).shape
+            burnin = int(shape[0] / 100.0 * 2.0)
+            thin = int(shape[0] / 100.0 / 2.0)
+        flat_samples = sampler.get_chain(discard=burnin, thin=thin, flat=True)
 
-        _best = np.percentile(flat_samples, [50], axis=0)
-        best = restore_params(_best)
-        _error = np.percentile(flat_samples, [84], axis=0) - _best
-        error = restore_params(_error)
+        p16, p50, p84 = np.percentile(flat_samples, [50], axis=0)
+        best = restore_params(p50)
+        error_high = restore_params(p84 - p50)
+        error_low = restore_params(p50 - p16)
 
         chi2 = np.sum(calculate_chi(best, func_fit) ** 2.0)
         return cls(
-            best, error, chi2, dof, np.array(0.0), mode_fitting='mcmc', sampler=sampler
+            best,
+            error_high,
+            error_low,
+            chi2,
+            dof,
+            np.array(0.0),
+            mode_fitting='mcmc',
+            sampler=sampler,
         )
 
     @classmethod
     def from_montecarlo(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
         '''Construct Solution() from montecarlo perturbations.
         '''
-        _best = np.percentile(params, [50], axis=0)
-        best = restore_params(_best)
-        _error = np.percentile(params, [84], axis=0) - _best
-        error = restore_params(_error)
+        p16, p50, p84 = np.percentile(params, [50], axis=0)
+        best = restore_params(p50)
+        error_high = restore_params(p84 - p50)
+        error_low = restore_params(p50 - p16)
         return cls(
             best,
-            error,
+            error_high,
+            error_low,
             0.0,
             0.0,
             np.array(0.0),
