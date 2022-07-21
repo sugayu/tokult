@@ -28,7 +28,7 @@ def freeman_disk(
     '''Freeman disk function
     '''
     r2h = 0.5 * r / rnorm
-    myu_0 = mass_dyn / (2 * np.pi * rnorm ** 2)
+    myu_0_norm = mass_dyn / rnorm
 
     I0 = sps.i0(r2h)
     K0 = sps.k0(r2h)
@@ -47,5 +47,5 @@ def freeman_disk(
         A[idx] = 0.0
     f_sightline = np.cos(phi) * np.sin(incl)
 
-    velocity = np.sqrt(4 * np.pi * myu_0 * rnorm * r2h ** 2 * A) * f_sightline
+    velocity = r2h * np.sqrt(2 * myu_0_norm * A) * f_sightline
     return velocity

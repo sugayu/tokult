@@ -25,7 +25,7 @@ def rotate_coord(pos: np.ndarray, angle: float) -> np.ndarray:
     '''
     rot = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
     _pos = pos[..., np.newaxis]
-    return np.squeeze(rot @ _pos)
+    return np.squeeze(rot @ _pos, -1)
 
 
 def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -58,6 +58,24 @@ def ifft2(uvcube: np.ndarray) -> np.ndarray:
     return cube
 
 
+def rfft2(cube: np.ndarray) -> np.ndarray:
+    '''2 dimensional real Fourier transform.
+    '''
+    cube_shift = np.fft.ifftshift(cube, axes=(1, 2))
+    uvcube = np.fft.rfft2(cube_shift, norm='forward')
+    uvcube = np.fft.fftshift(uvcube, axes=1)
+    return uvcube
+
+
+def irfft2(uvcube: np.ndarray) -> np.ndarray:
+    '''Inverse 2 dimensional real Fourier transform.
+    '''
+    cube_shift = np.fft.ifftshift(uvcube, axes=1)
+    cube_shift = np.fft.irfft2(cube_shift, norm='forward')
+    cube = np.fft.fftshift(cube_shift, axes=(1, 2))
+    return cube
+
+
 def fftconvolve(
     image: np.ndarray,
     kernel: np.ndarray,
@@ -70,14 +88,14 @@ def fftconvolve(
     between np.fft.fft2 and sp.signal.fftconvolve.
     '''
     size = image[0, :, :].size
-    uv = fft2(image)
-    uvpsf = fft2(kernel)
+    uv = rfft2(image)
+    uvpsf = rfft2(kernel)
     uv_noise = size * uv * uvpsf.real
 
     if uvcoverage is not None:
         uv_noise[np.logical_not(uvcoverage)] = 0.0
 
-    return ifft2(uv_noise).real
+    return irfft2(uv_noise)
 
     # image_full = sp_fftconvolve(image, kernel, mode='full', axes=axes)
 
@@ -100,14 +118,14 @@ def fftconvolve_noise(
     Convolution kernel for sky images and noises is different.
     '''
     size = noise[0, :, :].size
-    uv = fft2(noise)
-    uvpsf = fft2(kernel)
+    uv = rfft2(noise)
+    uvpsf = rfft2(kernel)
     uv_noise = size * uv * np.sqrt(abs(uvpsf.real))
 
     if uvcoverage is not None:
         uv_noise[np.logical_not(uvcoverage)] = 0.0
 
-    return ifft2(uv_noise).real
+    return irfft2(uv_noise)
 
 
 def no_lensing(coordinate: np.ndarray) -> np.ndarray:

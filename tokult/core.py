@@ -270,8 +270,8 @@ class Tokult:
         The obtained value is different from sum-of-weight by a factor of a few.
         '''
         assert self.dirtybeam is not None
-        uv = self.datacube.fft2(self.datacube.original)
-        uvpsf = misc.fft2(self.dirtybeam.original)
+        uv = self.datacube.rfft2(self.datacube.original)
+        uvpsf = misc.rfft2(self.dirtybeam.original)
         uv_noise = uv / np.sqrt(abs(uvpsf.real))
 
         v0, v1 = self.datacube.vlim
@@ -295,7 +295,7 @@ class Cube(object):
         self.original = imageplane
         self.imageplane = imageplane
         self.header = header
-        self.uvplane = self.fft2(self.original, zero_padding=True)
+        self.uvplane = self.rfft2(self.original, zero_padding=True)
         self.mask_FoV = np.logical_not(np.equal(self.original, 0.0)).astype(int)
 
         self.xlim: tuple[int, int]
@@ -331,7 +331,7 @@ class Cube(object):
         self.coord_imageplane = np.meshgrid(varray, yarray, xarray, indexing='ij')
         self.vgrid, self.ygrid, self.xgrid = self.coord_imageplane
         self.imageplane = self.original[self.vslice, self.yslice, self.xslice]
-        self.uvplane = self.fft2(self.original[self.vslice, :, :], zero_padding=True)
+        self.uvplane = self.rfft2(self.original[self.vslice, :, :], zero_padding=True)
 
     def rms(self, is_originalsize: bool = False) -> np.ndarray:
         '''Return rms noise of the datacube.
@@ -446,8 +446,8 @@ class Cube(object):
         return mock
 
     @staticmethod
-    def fft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
-        '''Wrapper of misc.fft2.
+    def rfft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
+        '''Wrapper of misc.rfft2.
         '''
         if np.any(idx := (np.logical_not(np.isfinite(data)))):
             if zero_padding:
@@ -456,7 +456,7 @@ class Cube(object):
                 raise ValueError(
                     'Input cube data includes non-finite values (NaN or Inf).'
                 )
-        return misc.fft2(data)
+        return misc.rfft2(data)
 
     @staticmethod
     def create_noise(
@@ -605,7 +605,7 @@ class DirtyBeam:
         self.original = beam
         self.imageplane = beam
         self.header = header
-        self.uvplane = misc.fft2(self.original)
+        self.uvplane = misc.rfft2(self.original)
 
     @classmethod
     def create(
@@ -686,7 +686,7 @@ class DirtyBeam:
         yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
         vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
         self.imageplane = self.original[vslice, yslice, xslice]
-        self.uvplane = misc.fft2(self.original[vslice, :, :])
+        self.uvplane = misc.rfft2(self.original[vslice, :, :])
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a cubic region from the dirty beam map.
@@ -789,7 +789,7 @@ class GravLens:
         coordinates -- position array including (x, y).
                        shape: (n, m, 2) and shape of x: (n, m)
         '''
-        return np.squeeze(self.jacob @ coordinates[..., np.newaxis])
+        return np.squeeze(self.jacob @ coordinates[..., np.newaxis], -1)
 
     def get_jacob(self):
         '''Get jacobian

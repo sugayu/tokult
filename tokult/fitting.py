@@ -1,6 +1,7 @@
 '''Modules of fitting functions
 '''
 from __future__ import annotations
+import datetime
 from dataclasses import dataclass, field
 import numpy as np
 from numpy.random import default_rng
@@ -267,7 +268,7 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     model_image = np.zeros(cubeshape)
     model_image[:, yslice, xslice] = model_cutout
     # model_image = construct_model_at_imageplane(params)
-    model_visibility = misc.fft2(model_image)
+    model_visibility = misc.rfft2(model_image)
     # image = misc.ifft2(model_visibility * beam_visibility)
     # return misc.fft2(image * mask_FoV)
     # return model_visibility * beam_visibility
@@ -667,6 +668,9 @@ def initialize_globalparameters_for_image(
         cube_error = np.broadcast_to(cube_error, cube.shape)
         cube_error = cube_error[mask_for_fit]
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
+    yy_grid = yy_grid[[0], :, :]
+    xx_grid = xx_grid[[0], :, :]
+    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
@@ -687,10 +691,10 @@ def initialize_globalparameters_for_uv(
     global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
     global lensing, beam_visibility, mask_FoV, mask
 
-    size = datacube.uvplane[0, :, :].size  # constant var needed for convolution
+    size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis.real / size
     cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
-    cubeshape = cube.shape
+    cubeshape = datacube.original[datacube.vslice, :, :].shape
     sigma = (cube / cube_error).real
     mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
     if mask_for_fit is not None:
@@ -707,6 +711,9 @@ def initialize_globalparameters_for_uv(
     # vv_grid, yy_grid, xx_grid = np.meshgrid(varray, yarray, xarray, indexing='ij')
 
     vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
+    yy_grid = yy_grid[[0], :, :]
+    xx_grid = xx_grid[[0], :, :]
+    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
     xslice, yslice = (datacube.xslice, datacube.yslice)
 
     # beam_visibility = beam_vis
