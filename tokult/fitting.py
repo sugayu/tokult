@@ -1,7 +1,6 @@
 '''Modules of fitting functions
 '''
 from __future__ import annotations
-import datetime
 from dataclasses import dataclass, field
 import numpy as np
 from numpy.random import default_rng
@@ -115,6 +114,7 @@ def montecarlo(
     nperturb: int = 1000,
     niter: int = 1,
     is_separate: bool = False,
+    progressbar: bool = False,
 ) -> Solution:
     '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
     '''
@@ -129,7 +129,7 @@ def montecarlo(
     args = (func_fit,)
 
     params_mc = np.empty((nperturb, len(_init)))
-    for j in tqdm.tqdm(range(nperturb), leave=None):
+    for j in tqdm.tqdm(range(nperturb), leave=None, disable=(not progressbar)):
         _init_j = _init
         global cube
         cube = datacube.perturbed(convolve=func_fullconvolve)
@@ -158,6 +158,7 @@ def mcmc(
     nwalkers: int = 64,
     nsteps: int = 5000,
     nprocesses: int = 12,
+    progressbar: bool = False,
 ) -> Solution:
     '''MCMC using emcee
     '''
@@ -197,7 +198,7 @@ def mcmc(
             pool=pool,
             moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2)],
         )
-        sampler.run_mcmc(__init, nsteps, progress=True)
+        sampler.run_mcmc(__init, nsteps, progress=progressbar)
 
     dof = datacube.imageplane.size - 1 - len(_init)
     return Solution.from_sampler(sampler, dof, func_fit)

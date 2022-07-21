@@ -79,6 +79,7 @@ class Tokult:
         nwalkers: int = 64,
         nsteps: int = 5000,
         nprocesses: int = 12,
+        progressbar: bool = False,
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
         '''
@@ -99,6 +100,7 @@ class Tokult:
                 nwalkers=nwalkers,
                 nsteps=nsteps,
                 nprocesses=nprocesses,
+                progressbar=progressbar,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
@@ -127,6 +129,7 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                progressbar=progressbar,
             )
         self.construct_modelcube(solution.best)
         return solution
@@ -143,6 +146,7 @@ class Tokult:
         nwalkers: int = 64,
         nsteps: int = 5000,
         nprocesses: int = 12,
+        progressbar: bool = False,
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
         '''
@@ -170,6 +174,7 @@ class Tokult:
                 nwalkers=nwalkers,
                 nsteps=nsteps,
                 nprocesses=nprocesses,
+                progressbar=progressbar,
             )
         elif optimization == 'ls':
             solution = fitting.least_square(
