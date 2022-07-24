@@ -332,13 +332,19 @@ def construct_model_at_imageplane_with(
     _globals = {}
 
     for k in keys_globals:
-        _globals[k] = globals()[k]
+        try:
+            _globals[k] = globals()[k]
+        except KeyError:
+            _globals[k] = None
         globals()[k] = locals()[k]
 
     model = construct_model_at_imageplane(params)
 
     for k in keys_globals:
-        globals()[k] = _globals[k]
+        if _globals[k] is not None:
+            globals()[k] = _globals[k]
+        else:
+            del globals()[k]
 
     return model
 
@@ -441,7 +447,7 @@ class Solution:
             thin = int(shape[0] / 100.0 / 2.0)
         flat_samples = sampler.get_chain(discard=burnin, thin=thin, flat=True)
 
-        p16, p50, p84 = np.percentile(flat_samples, [50], axis=0)
+        p16, p50, p84 = np.percentile(flat_samples, [16, 50, 84], axis=0)
         best = restore_params(p50)
         error_high = restore_params(p84 - p50)
         error_low = restore_params(p50 - p16)
@@ -462,7 +468,7 @@ class Solution:
     def from_montecarlo(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
         '''Construct Solution() from montecarlo perturbations.
         '''
-        p16, p50, p84 = np.percentile(params, [50], axis=0)
+        p16, p50, p84 = np.percentile(params, [16, 50, 84], axis=0)
         best = restore_params(p50)
         error_high = restore_params(p84 - p50)
         error_low = restore_params(p50 - p16)

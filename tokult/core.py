@@ -51,7 +51,7 @@ class Tokult:
         datacube = DataCube.create(data, header=header_data, index_hdul=index_data)
 
         dirtybeam: Optional[DirtyBeam]
-        if beam:
+        if beam is not None:
             dirtybeam = DirtyBeam.create(
                 beam, header=header_beam, index_hdul=index_beam
             )
@@ -62,6 +62,7 @@ class Tokult:
         if gravlens is not None:
             g1, g2, k = gravlens
             gl = GravLens.create(g1, g2, k, header=header_gamma, index_hdul=index_gamma)
+            gl.match_wcs_with(datacube)
         else:
             gl = None
         return cls(datacube, dirtybeam, gl)
@@ -349,10 +350,13 @@ class Cube(object):
         maskedimage[:, self.yslice, self.xslice] = None
         return misc.rms(maskedimage, axis=(1, 2))
 
-    def moment0(self) -> np.ndarray:
+    def moment0(self, is_originalsize: bool = False) -> np.ndarray:
         '''Return moment 0 maps using pixel indicies.
         '''
-        return np.sum(self.imageplane, axis=0)
+        if is_originalsize:
+            return np.sum(self.original, axis=0)
+        else:
+            return np.sum(self.imageplane, axis=0)
 
     def rms_moment0(self) -> float:
         '''Return rms noise of the moment 0 map.
@@ -574,6 +578,8 @@ class ModelCube(Cube):
             # model_convolved = np.empty_like(modelcube)
             # for i, image in enumerate(modelcube):
             model_convolved = convolve(modelcube)
+        else:
+            model_convolved = modelcube
 
         model_masked = model_convolved * datacube.mask_FoV
         xlim, ylim, vlim = datacube.xlim, datacube.ylim, datacube.vlim
