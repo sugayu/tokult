@@ -676,12 +676,14 @@ class DirtyBeam:
                     image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
                 )
             else:
-                return misc.fftconvolve(image[np.newaxis, :, :], kernel[[0], :, :])
+                return misc.fftconvolve(
+                    image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
+                )
         elif len(image.shape) == 3:
             if is_noise:
                 return misc.fftconvolve_noise(image, kernel, uvcoverage)
             else:
-                return misc.fftconvolve(image, kernel)
+                return misc.fftconvolve(image, kernel, uvcoverage)
         else:
             raise ValueError(f'dimension of image is two or three, not {dim}.')
 

@@ -90,7 +90,7 @@ def fftconvolve(
     size = image[0, :, :].size
     uv = rfft2(image)
     uvpsf = rfft2(kernel)
-    uv_noise = size * uv * uvpsf.real
+    uv_noise = size * uv * uvpsf
 
     if uvcoverage is not None:
         uv_noise[np.logical_not(uvcoverage)] = 0.0

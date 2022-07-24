@@ -722,7 +722,7 @@ def initialize_globalparameters_for_uv(
     global lensing, beam_visibility, mask_FoV, mask
 
     size = datacube.original[0, :, :].size  # constant var needed for convolution
-    cube = datacube.uvplane / beam_vis.real / size
+    cube = datacube.uvplane / beam_vis / size
     cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
     cubeshape = datacube.original[datacube.vslice, :, :].shape
     sigma = (cube / cube_error).real
