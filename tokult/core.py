@@ -704,8 +704,11 @@ class DirtyBeam:
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a cubic region from the dirty beam map.
         '''
-        xslice = cube.xslice
-        yslice = cube.yslice
+        _, ysize, xsize = self.original.shape
+        xlen = cube.xlim[1] - cube.xlim[0]
+        ylen = cube.ylim[1] - cube.ylim[0]
+        xslice = self.get_slice_at_center(xsize, xlen)
+        yslice = self.get_slice_at_center(ysize, ylen)
         vslice = cube.vslice
         self.cutout(xslice, yslice, vslice)
 
@@ -722,6 +725,17 @@ class DirtyBeam:
             beam = hdul[index_hdul].data
             header = hdul[index_hdul].header
         return np.squeeze(beam), header
+
+    @staticmethod
+    def get_slice_at_center(len_original: int, len_sub: int) -> slice:
+        '''Get a central slice of the original array.
+        '''
+        if len_original % 2 == 0:  # even
+            margin_end = (len_original - len_sub) // 2
+            margin_begin = len_original - len_sub - margin_end
+        else:  # odd
+            margin_begin = (len_original - len_sub) // 2
+        return slice(margin_begin, margin_begin + len_sub)
 
 
 class GravLens:
@@ -804,7 +818,7 @@ class GravLens:
         '''
         return np.squeeze(self.jacob @ coordinates[..., np.newaxis], -1)
 
-    def get_jacob(self):
+    def get_jacob(self) -> np.ndarray:
         '''Get jacobian
         '''
         g1 = self.gamma1
@@ -818,7 +832,7 @@ class GravLens:
         # assert jacob.shape == (n, m, 2, 2)
         return jacob
 
-    def match_wcs_with(self, cube: DataCube):
+    def match_wcs_with(self, cube: DataCube) -> None:
         '''Match the world coordinate system with input data.
         '''
         wcs_cube = wcs.WCS(cube.header)
