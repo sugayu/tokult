@@ -12,7 +12,6 @@ from astropy.wcs import WCS
 import tqdm
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
-from numpy.typing import ArrayLike
 import emcee
 from emcee.moves import DEMove, DESnookerMove
 import multiprocessing
@@ -402,6 +401,7 @@ class Solution:
         self.sampler = sampler
         self.params_mc = params_mc
         self.output = output
+        self.meta = self.MetaInfoOfSolution()
 
     @classmethod
     def from_leastsquare(
@@ -483,6 +483,25 @@ class Solution:
             mode_fitting='montecarlo',
         )
 
+    def set_metainfo(
+        self, z: Optional[float] = None, header: Optional[fits.Header] = None
+    ) -> None:
+        '''Set meta infomation used in Solution
+        '''
+        keys_arguments = ['z', 'header']
+
+        for k in keys_arguments:
+            if value_input := locals()[k] is not None:
+                setattr(self.meta, k, value_input)
+
+    @dataclass
+    class MetaInfoOfSolution:
+        '''Meta data container of Solution.
+        '''
+
+        z: float = 0.0
+        header: Optional[fits.Header] = None
+
 
 class InputParams(NamedTuple):
     '''Input parameters for construct_model_at_imageplane.
@@ -503,10 +522,12 @@ class InputParams(NamedTuple):
     PA_emi: float
     inclination_emi: float
 
-    def to_units(self, header: fits.Header) -> FitParamsWithUnits:
+    def to_units(
+        self, header: fits.Header, redshift: float = 0.0
+    ) -> FitParamsWithUnits:
         '''Return input parameters with units.
         '''
-        return FitParamsWithUnits.from_inputparams(self)
+        return FitParamsWithUnits.from_inputparams(self, header, redshift)
 
 
 @dataclass
@@ -895,13 +916,15 @@ def least_square_moment0(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
-    mask_use: Optional[ArrayLike] = None,
+    mask_use: Optional[np.ndarray] = None,
 ) -> list[float]:
     '''Least square fitting of moment 0 map.
 
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
-    initialize_globalparameters_for_moment(datacube, func_convolve, func_lensing, mom=0)
+    initialize_globalparameters_for_moment(
+        datacube, func_convolve, func_lensing, mom=0, mask_for_fit=mask_use
+    )
     func_fit = construct_model_moment0
 
     x0, y0 = datacube.xgrid.mean(), datacube.ygrid.mean()
@@ -911,7 +934,7 @@ def least_square_moment0(
         (-np.inf, -np.inf, 0, 0, 0, 0),
         (np.inf, np.inf, np.pi, 0.5 * np.pi, np.inf, np.inf),
     )
-    args = (func_fit, mask_use)
+    args = (func_fit,)
     output = sp_least_squares(calculate_chi, init, args=args, bounds=bound)
     return output.x
 
@@ -926,7 +949,13 @@ def least_square_moment1(
 
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
-    initialize_globalparameters_for_moment(datacube, func_convolve, func_lensing, mom=1)
+    rms = datacube.rms_moment0()
+    moment1 = datacube.pixmoment1(thresh=3 * rms)
+    mask = np.isfinite(moment1)
+
+    initialize_globalparameters_for_moment(
+        datacube, func_convolve, func_lensing, mom=1, mask_for_fit=mask
+    )
     func_fit = construct_model_moment1
 
     bound = (
@@ -934,11 +963,7 @@ def least_square_moment1(
         (0.5 * np.pi, np.inf, np.inf, np.inf, 2 * np.pi, np.inf, np.inf),
     )
 
-    rms = datacube.rms_moment0()
-    moment1 = datacube.pixmoment1(thresh=3 * rms)
-    mask = np.isfinite(moment1)
-
-    args = (func_fit, mask)
+    args = (func_fit,)
     output = sp_least_squares(calculate_chi, init, args=args, bounds=bound)
     return output.x
 
@@ -948,10 +973,11 @@ def initialize_globalparameters_for_moment(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     mom: int = 0,
+    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py.
     '''
-    global cube, cube_error, xx_grid, yy_grid, lensing, convolve
+    global cube, cube_error, xx_grid, yy_grid, lensing, convolve, mask
 
     if mom == 0:
         cube = datacube.moment0()
@@ -966,6 +992,7 @@ def initialize_globalparameters_for_moment(
     _, yy_grid, xx_grid = datacube.coord_imageplane
     xx_grid = xx_grid[0, :, :]
     yy_grid = yy_grid[0, :, :]
+    mask = mask_for_fit
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve

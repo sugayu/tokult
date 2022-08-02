@@ -132,6 +132,8 @@ class Tokult:
                 mask_for_fit=mask_for_fit,
                 progressbar=progressbar,
             )
+        _redshift_tmp = self.gravlens.z_source if self.gravlens is not None else None
+        solution.set_metainfo(z=_redshift_tmp, header=self.datacube.header)
         self.construct_modelcube(solution.best)
         return solution
 
@@ -191,6 +193,8 @@ class Tokult:
                 mask_for_fit=mask_for_fit,
                 niter=niter,
             )
+        _redshift_tmp = self.gravlens.z_source if self.gravlens is not None else None
+        solution.set_metainfo(z=_redshift_tmp, header=self.datacube.header)
         self.construct_modelcube(solution.best)
         return solution
 
@@ -284,6 +288,14 @@ class Tokult:
         n = uv_noise[[v0 - 1, v1], :, :].real
         p = uvpsf[[v0 - 1, v1], :, :].real
         return 1.0 / n[p > -p.min()].std() ** 2
+
+    def use_redshifts_of(
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
+    ) -> None:
+        '''Set redshifts for gravitational lensing and physical units.
+        '''
+        if self.gravlens is not None:
+            self.gravlens.use_redshifts_of(z_lens, z_source, z_assumed)
 
 
 class Cube(object):
@@ -754,11 +766,22 @@ class GravLens:
         self.original_gamma1 = gamma1
         self.original_gamma2 = gamma2
         self.original_kappa = kappa
+
+        self.gamma1_cutout = gamma1
+        self.gamma2_cutout = gamma2
+        self.kappa_cutout = kappa
+
         self.gamma1 = gamma1
         self.gamma2 = gamma2
         self.kappa = kappa
+
         self.header = header
         self.jacob = self.get_jacob()
+
+        self.z_lens: Optional[float] = None
+        self.z_source: Optional[float] = None
+        self.z_assumed: Optional[float] = None
+        self.distance_ratio = 1.0
 
     @classmethod
     def create(
@@ -835,6 +858,7 @@ class GravLens:
     def match_wcs_with(self, cube: DataCube) -> None:
         '''Match the world coordinate system with input data.
         '''
+        assert self.header is not None
         wcs_cube = wcs.WCS(cube.header)
         wcs_gl = wcs.WCS(self.header)
         skycoord_wcs, _, _ = wcs_cube.pixel_to_world(
@@ -842,10 +866,45 @@ class GravLens:
         )
         idx = wcs_gl.world_to_array_index(skycoord_wcs)
         shape = cube.xgrid.shape[1:]
-        self.gamma1 = self.original_gamma1[idx].reshape(*shape)
-        self.gamma2 = self.original_gamma2[idx].reshape(*shape)
-        self.kappa = self.original_kappa[idx].reshape(*shape)
+        self.gamma1_cutout = self.original_gamma1[idx].reshape(*shape)
+        self.gamma2_cutout = self.original_gamma2[idx].reshape(*shape)
+        self.kappa_cutout = self.original_kappa[idx].reshape(*shape)
+        self.gamma1 = self.gamma1_cutout * self.distance_ratio
+        self.gamma2 = self.gamma2_cutout * self.distance_ratio
+        self.kappa = self.kappa_cutout * self.distance_ratio
         self.jacob = self.get_jacob()
+
+    def use_redshifts_of(
+        self, z_lens: float, z_source: float, z_assumed: float = np.inf,
+    ) -> None:
+        '''Correct lensing parameters with the redshifts.
+        '''
+        self.z_lens = z_lens
+        self.z_source = z_source
+        self.z_assumed = z_assumed
+        self.distance_ratio = self.get_angular_distance_ratio(
+            z_lens, z_source, z_assumed
+        )
+        self.gamma1 = self.gamma1_cutout * self.distance_ratio
+        self.gamma2 = self.gamma2_cutout * self.distance_ratio
+        self.kappa = self.kappa_cutout * self.distance_ratio
+        self.jacob = self.get_jacob()
+
+    @staticmethod
+    def get_angular_distance_ratio(
+        cls, z_lens: float, z_source: float, z_assumed: float = np.inf
+    ) -> float:
+        '''Angular distance ratio between D_LS and D_S.
+        '''
+        D_S = c.cosmo.angular_diameter_distance(z_source)
+        D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
+        if np.isinf(z_assumed):
+            return D_LS / D_S
+        D_ratio = D_LS / D_S
+        D_S_assumed = c.cosmo.angular_diameter_distance(z_assumed)
+        D_LS_assumed = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_assumed)
+        D_ratio_assumed = D_LS_assumed / D_S_assumed
+        return (D_ratio / D_ratio_assumed).decompose().value
 
     @staticmethod
     def loadfits(
