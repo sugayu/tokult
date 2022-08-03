@@ -156,7 +156,7 @@ def mcmc(
     is_separate: bool = False,
     nwalkers: int = 64,
     nsteps: int = 5000,
-    nprocesses: int = 12,
+    nprocesses: int = 1,
     progressbar: bool = False,
 ) -> Solution:
     '''MCMC using emcee
@@ -491,7 +491,7 @@ class Solution:
         keys_arguments = ['z', 'header']
 
         for k in keys_arguments:
-            if value_input := locals()[k] is not None:
+            if (value_input := locals()[k]) is not None:
                 setattr(self.meta, k, value_input)
 
     @dataclass
@@ -501,6 +501,11 @@ class Solution:
 
         z: float = 0.0
         header: Optional[fits.Header] = None
+
+    def to_best_with_units(self) -> FitParamsWithUnits:
+        '''Get best parameters with physical units.
+        '''
+        return self.best.to_units(header=self.meta.header, redshift=self.meta.z)
 
 
 class InputParams(NamedTuple):
@@ -890,7 +895,7 @@ def initialguess(
     if not is_separate:
         param1[5] = param0[0]
         param1[6] = param0[1]
-        param1[4] = param0[2]
+        # param1[4] = param0[2]  # PA should come from dynamics...?
         param1[0] = param0[3]
         param1[1] = param0[4]
 

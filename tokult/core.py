@@ -890,16 +890,34 @@ class GravLens:
         self.kappa = self.kappa_cutout * self.distance_ratio
         self.jacob = self.get_jacob()
 
+    def reset_redshifts(self) -> None:
+        '''Reset redshifts.
+        '''
+        self.z_lens = None
+        self.z_source = None
+        self.z_assumed = None
+        self.distance_ratio = 1.0
+        self.gamma1 = self.gamma1_cutout
+        self.gamma2 = self.gamma2_cutout
+        self.kappa = self.kappa_cutout
+        self.jacob = self.get_jacob()
+
+    def magnification(self) -> np.ndarray:
+        '''Get magnification factor.
+        '''
+        gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
+        return 1 / ((1 - self.kappa) ** 2 - gamma2)
+
     @staticmethod
     def get_angular_distance_ratio(
-        cls, z_lens: float, z_source: float, z_assumed: float = np.inf
+        z_lens: float, z_source: float, z_assumed: float = np.inf
     ) -> float:
         '''Angular distance ratio between D_LS and D_S.
         '''
         D_S = c.cosmo.angular_diameter_distance(z_source)
         D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
         if np.isinf(z_assumed):
-            return D_LS / D_S
+            return (D_LS / D_S).decompose().value
         D_ratio = D_LS / D_S
         D_S_assumed = c.cosmo.angular_diameter_distance(z_assumed)
         D_LS_assumed = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_assumed)
