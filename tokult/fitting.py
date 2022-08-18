@@ -403,6 +403,12 @@ class Solution:
         self.output = output
         self.meta = self.MetaInfoOfSolution()
 
+        global parameters_preset, index_free, index_fixp_target, index_fixp_source
+        self.parameters_preset = np.copy(parameters_preset)
+        self.index_free = np.copy(index_free)
+        self.index_fixp_target = np.copy(index_fixp_target)
+        self.index_fixp_source = np.copy(index_fixp_source)
+
     @classmethod
     def from_leastsquare(
         cls, output: OptimizeResult, chi2: float, dof: float
@@ -502,10 +508,43 @@ class Solution:
         z: float = 0.0
         header: Optional[fits.Header] = None
 
-    def to_best_with_units(self) -> FitParamsWithUnits:
+    def add_units(
+        self, params: Optional[Union[InputParams, np.ndarray]] = None
+    ) -> FitParamsWithUnits:
         '''Get best parameters with physical units.
         '''
-        return self.best.to_units(header=self.meta.header, redshift=self.meta.z)
+        if params is None:
+            return self.best.to_units(header=self.meta.header, redshift=self.meta.z)
+        elif isinstance(params, InputParams):
+            return params.to_units(header=self.meta.header, redshift=self.meta.z)
+        elif isinstance(params, np.ndarray):
+            return InputParamsArray.from_ndarray(params).to_units(
+                header=self.meta.header, redshift=self.meta.z
+            )
+
+    def restore_params(
+        self, params: Union[np.ndarray, tuple[float, ...]]
+    ) -> Union[np.ndarray, tuple[float, ...]]:
+        '''Restore parameters with pfix by inserting parameters into params.
+        '''
+        if (parameters_preset is None) or (len(params) == 14):
+            return params
+
+        if isinstance(params, np.ndarray):
+            if params.ndim == 2:
+                newshape = (params.shape[0], 1)
+                _parameters_preset = np.tile(self.parameters_preset, newshape).T
+                _parameters_preset[self.index_free, :] = params
+                _parameters_preset[self.index_fixp_target, :] = _parameters_preset[
+                    self.index_fixp_source, :
+                ]
+                return _parameters_preset
+
+        parameters_preset[self.index_free] = params
+        parameters_preset[self.index_fixp_target] = parameters_preset[
+            self.index_fixp_source
+        ]
+        return tuple(parameters_preset)
 
 
 class InputParams(NamedTuple):
@@ -533,6 +572,37 @@ class InputParams(NamedTuple):
         '''Return input parameters with units.
         '''
         return FitParamsWithUnits.from_inputparams(self, header, redshift)
+
+
+class InputParamsArray(NamedTuple):
+    '''Input parameter array for construct_model_at_imageplane.
+    '''
+
+    x0_dyn: np.ndarray
+    y0_dyn: np.ndarray
+    PA_dyn: np.ndarray
+    inclination_dyn: np.ndarray
+    radius_dyn: np.ndarray
+    velocity_sys: np.ndarray
+    mass_dyn: np.ndarray
+    brightness_center: np.ndarray
+    velocity_dispersion: np.ndarray
+    radius_emi: np.ndarray
+    x0_emi: np.ndarray
+    y0_emi: np.ndarray
+    PA_emi: np.ndarray
+    inclination_emi: np.ndarray
+
+    def to_units(
+        self, header: fits.Header, redshift: float = 0.0
+    ) -> FitParamsWithUnits:
+        '''Return input parameters with units.
+        '''
+        return FitParamsWithUnits.from_inputparams(self, header, redshift)
+
+    @classmethod
+    def from_ndarray(cls, params: np.ndarray):
+        pass
 
 
 @dataclass
@@ -624,14 +694,19 @@ class FitParamsWithUnits:
             self.radius_emi = self.radius_emi.to(u.kpc, self.pixelscale)
             self.mass_dyn = self.mass_dyn.physical.to(u.Msun, self.diskmassscale)
 
+    def vmax(self):
+        '''Maximum rotation velcoity.
+        '''
+        return func.maximum_rotation_velocity(self.mass_dyn, self.radius_dyn)
+
     @classmethod
     def from_inputparams(
         cls,
-        inputparams: InputParams,
+        inputparams: Union[InputParams, InputParamsArray],
         header: Optional[fits.Header] = None,
         z: float = 0.0,
     ) -> FitParamsWithUnits:
-        '''Constructer from dict
+        '''Constructer from InputParams
         '''
         dictionary = inputparams._asdict()
         input_dict = {}

@@ -289,13 +289,13 @@ class Tokult:
         p = uvpsf[[v0 - 1, v1], :, :].real
         return 1.0 / n[p > -p.min()].std() ** 2
 
-    def use_redshifts_of(
+    def use_redshifts(
         self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
         '''Set redshifts for gravitational lensing and physical units.
         '''
         if self.gravlens is not None:
-            self.gravlens.use_redshifts_of(z_lens, z_source, z_assumed)
+            self.gravlens.use_redshifts(z_lens, z_source, z_assumed)
 
 
 class Cube(object):
@@ -874,7 +874,7 @@ class GravLens:
         self.kappa = self.kappa_cutout * self.distance_ratio
         self.jacob = self.get_jacob()
 
-    def use_redshifts_of(
+    def use_redshifts(
         self, z_lens: float, z_source: float, z_assumed: float = np.inf,
     ) -> None:
         '''Correct lensing parameters with the redshifts.

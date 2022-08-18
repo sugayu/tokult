@@ -1,16 +1,15 @@
 import tokult
-from tokult import Tokult
 import datetime
 import numpy as np
 from astropy.io import fits
 
-tok = Tokult.launch(
+tok = tokult.Tokult.launch(
     'cube_dirty.fits',
     'cube_dirty.psf.fits',
     ('gamma1.fits', 'gamma2.fits', 'kappa.fits'),
 )
 tok.set_region((226, 286), (226, 286), (5, 12))
-tok.use_redshifts_of(z_lens=0.541, z_source=9.1111)
+tok.use_redshifts(z_lens=0.541, z_source=9.1111)
 
 hudl = fits.open('cube_dirty_uniform.psf.fits')
 uvpsf_uniform = tokult.misc.rfft2(np.squeeze(hudl[0].data))
