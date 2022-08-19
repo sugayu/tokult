@@ -750,8 +750,8 @@ def get_bound_params(
     radius_emi: tuple[float, float] = (0.0, np.inf),
     x0_emi: tuple[float, float] = (-np.inf, np.inf),
     y0_emi: tuple[float, float] = (-np.inf, np.inf),
-    PA_emi: tuple[float, float] = (0.0, np.pi),
-    inclination_emi: tuple[float, float] = (0.0, np.pi),
+    PA_emi: tuple[float, float] = (0.0, 2 * np.pi),
+    inclination_emi: tuple[float, float] = (0.0, np.pi / 2),
 ) -> tuple[InputParams, InputParams]:
     '''Return bound parameters.
     '''
@@ -826,12 +826,13 @@ def initialize_globalparameters_for_uv(
     cube = datacube.uvplane / beam_vis / size
     cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
     cubeshape = datacube.original[datacube.vslice, :, :].shape
-    sigma = (cube / cube_error).real
-    mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
-    if mask_for_fit is not None:
-        mask = mask_for_fit & mask_to_remove_outlier
-    else:
-        mask = mask_to_remove_outlier
+    # sigma = (cube / cube_error).real
+    # mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
+    # if mask_for_fit is not None:
+    #     mask = mask_for_fit & mask_to_remove_outlier
+    # else:
+    #     mask = mask_to_remove_outlier
+    mask = mask_for_fit
     cube_error = np.broadcast_to(cube_error, cube.shape)
     cube = cube[mask]
     cube_error = cube_error[mask]
