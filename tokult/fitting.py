@@ -2,6 +2,10 @@
 '''
 from __future__ import annotations
 from dataclasses import dataclass, field
+
+# import time
+# import pickle
+# from pathlib import Path
 import numpy as np
 from numpy.random import default_rng
 from scipy.optimize import least_squares as sp_least_squares
@@ -14,7 +18,7 @@ from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 import emcee
 from emcee.moves import DEMove, DESnookerMove
-import multiprocessing
+from multiprocessing.pool import Pool
 from . import function as func
 from . import misc
 
@@ -156,7 +160,7 @@ def mcmc(
     is_separate: bool = False,
     nwalkers: int = 64,
     nsteps: int = 5000,
-    nprocesses: int = 1,
+    pool: Optional[Pool] = None,
     progressbar: bool = False,
 ) -> Solution:
     '''MCMC using emcee
@@ -188,16 +192,19 @@ def mcmc(
     ndim = len(_init)
     __init = np.array(_init)
     __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
-    with multiprocessing.get_context('fork').Pool(nprocesses) as pool:
-        sampler = emcee.EnsembleSampler(
-            nwalkers,
-            ndim,
-            calculate_log_probability,
-            args=args,
-            pool=pool,
-            moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2)],
-        )
-        sampler.run_mcmc(__init, nsteps, progress=progressbar)
+
+    if pool is not None:
+        map_globals_to_childprocesses(pool)
+
+    sampler = emcee.EnsembleSampler(
+        nwalkers,
+        ndim,
+        calculate_log_probability,
+        args=args,
+        pool=pool,
+        moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2)],
+    )
+    sampler.run_mcmc(__init, nsteps, progress=progressbar)
 
     dof = datacube.imageplane.size - 1 - len(_init)
     return Solution.from_sampler(sampler, dof, func_fit)
@@ -1080,3 +1087,49 @@ def initialize_globalparameters_for_moment(
     f_no_lensing: Callable = misc.no_lensing
     convolve = func_convolve if func_convolve else f_no_convolve
     lensing = func_lensing if func_lensing else f_no_lensing
+
+
+def map_globals_to_childprocesses(pool: Pool) -> None:
+    '''Map parent global parameters to global parameters worked in pooled child processes.
+    '''
+    keys_globals = [
+        'cube',
+        'cube_error',
+        'cubeshape',
+        'xx_grid',
+        'yy_grid',
+        'vv_grid',
+        'xslice',
+        'yslice',
+        'lensing',
+        'convolve',
+        'mask',
+        'mask_FoV',
+        'parameters_preset',
+        'index_free',
+        'index_fixp_target',
+        'index_fixp_source',
+    ]
+    parent_globals = {}
+
+    for k in keys_globals:
+        try:
+            parent_globals[k] = globals()[k]
+        except KeyError:
+            pass
+
+    # fn_pkl = f'tokult_map_globals_to_childprocesses-{time.time()}.pkl'
+    # with open(fn_pkl, 'wb') as f:
+    #     pickle.dump(parent_globals, f)
+    # NOTE: need to use private attributes to know # of processes used in pool.
+    pool.map(_set_globals_in_process, [parent_globals] * pool._processes)  # type:ignore
+    # Path(fn_pkl).unlink()
+
+
+def _set_globals_in_process(parent_params: dict) -> None:
+    '''Set global parameters in a child process.
+    '''
+    # with open(fn_pkl, 'rb') as f:
+    #     parent_params = pickle.load(f)
+    for key, value in parent_params.items():
+        globals()[key] = value

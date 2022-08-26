@@ -5,6 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 from astropy.io import fits
 from astropy import wcs
+from multiprocessing.pool import Pool
 from typing import Callable, Sequence, Optional, Union
 from . import common as c
 from . import fitting
@@ -79,7 +80,7 @@ class Tokult:
         optimization: str = 'mcmc',
         nwalkers: int = 64,
         nsteps: int = 5000,
-        nprocesses: int = 12,
+        pool: Optional[Pool] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
         '''First main function to fit 3d model to data cube on image plane.
@@ -100,7 +101,7 @@ class Tokult:
                 mask_for_fit=mask_for_fit,
                 nwalkers=nwalkers,
                 nsteps=nsteps,
-                nprocesses=nprocesses,
+                pool=pool,
                 progressbar=progressbar,
             )
         elif optimization == 'ls':
@@ -149,6 +150,7 @@ class Tokult:
         nwalkers: int = 64,
         nsteps: int = 5000,
         nprocesses: int = 12,
+        pool: Optional[Pool] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
         '''Second main function to fit 3d model to data cube on uv plane.
@@ -176,7 +178,7 @@ class Tokult:
                 mask_for_fit=mask_for_fit,
                 nwalkers=nwalkers,
                 nsteps=nsteps,
-                nprocesses=nprocesses,
+                pool=pool,
                 progressbar=progressbar,
             )
         elif optimization == 'ls':
