@@ -838,8 +838,8 @@ class GravLens:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
         This method use gravitational lensing parameters: gamma1, gamma2, and kappa.
-        coordinates -- position array including (x, y).
-                       shape: (n, m, 2) and shape of x: (n, m)
+        coordinates: position array including (x, y).
+        shape: (n, m, 2) and shape of x: (n, m)
         '''
         return np.squeeze(self.jacob @ coordinates[..., np.newaxis], -1)
 

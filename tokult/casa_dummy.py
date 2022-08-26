@@ -1,6 +1,8 @@
 '''Dummy CASA modules
 '''
 
+__all__: list = []
+
 
 def listobs(vis, listfile):
     '''Dummy function of listobs.

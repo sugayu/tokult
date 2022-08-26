@@ -558,7 +558,7 @@ class InputParams(NamedTuple):
     '''Input parameters for construct_model_at_imageplane.
     '''
 
-    x0_dyn: float
+    x0_dyn: float  #: the coordinate on x-axis
     y0_dyn: float
     PA_dyn: float
     inclination_dyn: float
