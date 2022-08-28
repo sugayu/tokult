@@ -4,14 +4,16 @@ import numpy as np
 from scipy.signal import fftconvolve as sp_fftconvolve
 from astropy import units as u
 import astropy.constants as const
-from typing import Optional
+from typing import Optional, Union
 from .common import cosmo
 
 __all__: list = []
 
 
 ##
-def rms(cube: np.ndarray, axis: Optional[tuple[int, ...]] = None) -> np.ndarray:
+def rms(
+    cube: np.ndarray, axis: Optional[tuple[int, ...]] = None
+) -> Union[np.ndarray, float]:
     '''Compute r.m.s.
     '''
     sumsq = np.nansum(cube ** 2, axis=axis)

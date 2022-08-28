@@ -11,14 +11,26 @@ from . import common as c
 from . import fitting
 from . import misc
 
-__all__ = ['Tokult', 'DataCube', 'ModelCube', 'DirtyBeam', 'GravLens']
+__all__ = ['Tokult', 'Cube', 'DataCube', 'ModelCube', 'DirtyBeam', 'GravLens']
 
 
 ##
 class Tokult:
-    '''Main class in tokult package.
+    '''Interface of Tokult.
 
-    Users manage tokult methods via this class.
+    Users specify data to launch an instance object and start fitting through
+    the instance. This class contains observed data, psf, and lensing parameters,
+    along with useful functions to manipulate data and models.
+
+    Args:
+        datacube (DataCube):
+        dirtybeam (Optional[DirtyBeam], optional): Defaults to None.
+        gravlens (Optional[GravLens], optional): Defaults to None.
+
+    Examples:
+        >>> import tokult
+        >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
+                                       ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
     '''
 
     def __init__(
@@ -37,17 +49,47 @@ class Tokult:
         cls,
         data: Union[np.ndarray, str],
         beam: Union[np.ndarray, str, None] = None,
-        gravlens: Union[
-            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str], None
-        ] = None,
+        gravlens: Union[tuple[np.ndarray, ...], tuple[str, ...], None] = None,
         header_data: Optional[fits.Header] = None,
         header_beam: Optional[fits.Header] = None,
         header_gamma: Optional[fits.Header] = None,
         index_data: int = 0,
         index_beam: int = 0,
         index_gamma: int = 0,
-    ):
-        '''Constructer of Tokult.
+    ) -> Tokult:
+        '''Constructer of ``Tokult``.
+
+        Construct an instance easier than to use the init constructer.
+
+        Args:
+            data (Union[np.ndarray, str]): Observed data. The format is a data array or
+                a fits file name.
+            beam (Union[np.ndarray, str, None], optional): Dirty beam or point spread
+                function (PSF). The format is a data array or a fits file name.
+                Defaults to None.
+            gravlens (Union[tuple[np.ndarray, ...], tuple[str, ...]], None, optional):
+                Gravitational lensing parameters. The format is a tuple containing
+                the three data array or fits file names of parameters: gamma1, gamma2,
+                and kappa. Defaults to None.
+            header_data (Optional[fits.Header], optional): Header of data.
+                Defaults to None.
+                This is necessary when the ``data`` is not given in a fits file.
+            header_beam (Optional[fits.Header], optional): Header of psf.
+                Defaults to None.
+                This is necessary when ``beam`` is not given in a fits file.
+            header_gamma (Optional[fits.Header], optional): Header of gamma.
+                Defaults to None.
+                This is necessary when ``gravlens`` is not given in fits files.
+            index_data (int, optional): Index of fits extensions of the data fits file.
+                Defaults to 0.
+            index_beam (int, optional): Index of fits extensions of the beam fits file.
+                Defaults to 0.
+            index_gamma (int, optional): Index of fits extensions of the lens fits
+                files. Defaults to 0.
+
+        Examples:
+            >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
+                                           ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
         '''
         datacube = DataCube.create(data, header=header_data, index_hdul=index_data)
 
@@ -72,18 +114,53 @@ class Tokult:
         self,
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+        fix: Optional[fitting.FixParams] = None,
+        optimization: str = 'mc',
         niter: int = 1,
         nperturb: int = 1000,
-        fix: Optional[fitting.FixParams] = None,
-        is_separate: bool = False,
-        mask_for_fit: Optional[np.ndarray] = None,
-        optimization: str = 'mcmc',
         nwalkers: int = 64,
         nsteps: int = 5000,
         pool: Optional[Pool] = None,
+        is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
-        '''First main function to fit 3d model to data cube on image plane.
+        '''Fit a 3d model to the data cube on the image plane.
+
+        Args:
+            init (Sequence[float]): Initial parameters of fitting.
+            bound (Optional[tuple[Sequence[float], Sequence[float]], optional):
+                Boundaries of parameters. Defaults to None.
+                When None is given, the default parameter boundaries are used.
+                The boundaries can be easily set using ``get_bound_params``.
+                Currently, in the mcmc method, only flat prior distributions
+                are available through this argument.
+            fix (Optional[fitting.FixParams], optional): Defaults to None.
+            optimization (str, optional): Defaults to 'mc'.
+            niter (int, optional): Number of iterations of fitting, used
+                in the least square method. Defaults to 1.
+            nperturb (int, optional): Number of perturbations in the Monte Carlo
+                method. Defaults to 1000.
+            nwalkers (int, optional): Number of walkers, used in the MCMC method.
+                Defaults to 64.
+            nsteps (int, optional): Number of steps, used in the MCMC method.
+                Defaults to 5000.
+            pool (Optional[Pool], optional): multiprocessing.pool for a multi-process
+                MCMC fitting. Defaults to None.
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+            mask_for_fit (Optional[np.ndarray], optional): Mask specifying pixels
+                used for fitting. Defaults to None.
+            progressbar (bool, optional): If True, a progress bar is shown.
+                Defaults to False.
+
+        Returns:
+            fitting.Solution: Fitting results and related parameters.
+
+        Examples:
+            >>> sol = tok.imagefit(init, bound, optimization='mc')
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -143,23 +220,66 @@ class Tokult:
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
-        niter: int = 1,
-        is_separate: bool = False,
-        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
+        niter: int = 1,
         nwalkers: int = 64,
         nsteps: int = 5000,
-        nprocesses: int = 12,
         pool: Optional[Pool] = None,
+        is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
-        '''Second main function to fit 3d model to data cube on uv plane.
+        '''Fit a 3d model to the data cube on the uv plane.
+
+        Args:
+            init (Sequence[float]): Initial parameters of fitting.
+                a function to guess initial parameters: ``tokult.initialguess()``.
+            bound (Optional[tuple[Sequence[float], Sequence[float]], optional):
+                Boundaries of parameters. Defaults to None.
+                When None is given, the default parameter boundaries are used.
+                The boundaries can be easily set using ``get_bound_params``.
+                Currently, in the mcmc method, only flat prior distributions
+                are available through this argument.
+            fix (Optional[fitting.FixParams], optional): Fix parameters during
+                fitting. See ``FixParams``. Defaults to None.
+            optimization (str, optional): Method to optimize the 3D model.
+                - 'ls': least square method.
+                - 'mcmc': Malcov Chain Monte Carlo method.
+                Defaults to 'mcmc'.
+            niter (int, optional): Number of iterations of fitting, used
+                in the least square method. Defaults to 1.
+            nperturb (int, optional): Number of perturbations in the Monte Carlo
+                method. Defaults to 1000.
+            nwalkers (int, optional): Number of walkers, used in the MCMC method.
+                Defaults to 64.
+            nsteps (int, optional): Number of steps, used in the MCMC method.
+                Defaults to 5000.
+            pool (Optional[Pool], optional): multiprocessing.pool for a multi-process
+                MCMC fitting. Defaults to None.
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+            mask_for_fit (Optional[np.ndarray], optional): Mask specifying pixels
+                used for fitting. In uv fitting, specifying the uv-coverage is
+                important, which is passed through this argument. Defaults to None.
+            progressbar (bool, optional): If True, a progress bar is shown.
+                Defaults to False.
+
+        Returns:
+            fitting.Solution: Fitting results and related parameters.
+
+        Examples:
+            >>> sol = tok.uvfit(init, bound, optimization='mcmc')
+
+        Note:
+            The input parameters are the same as ``imagefit``.
         '''
         if self.dirtybeam:
             beam_visibility = self.dirtybeam.uvplane
             norm_weight = self.calculate_normweight()
         else:
-            msg = '"DirtyBeam" is necessarily for uvfit.'
+            msg = '"DirtyBeam" is necessary for uvfit.'
             c.logger.warning(msg)
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -202,6 +322,26 @@ class Tokult:
 
     def initialguess(self, is_separate: bool = False) -> fitting.InputParams:
         '''Guess initial input parameters for fitting.
+
+        Fit tow-dimensional moment-0 (flux) map and moment-1 (velocity) map then
+        Estimate input parameters from the 2-d fitting results.
+
+        Args:
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+
+        Returns:
+            fitting.InputParams: Best-guessed input parameters.
+
+        Examples:
+            >>> init = tok.initialguess()
+
+        Note:
+            Initial parameters are crucial for parameter fitting, especially in
+            the least-square and Monte Carlo methods and being related with speed
+            of convergence in the MCMC method.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -209,13 +349,32 @@ class Tokult:
             self.datacube, func_convolve, func_lensing, is_separate
         )
 
-    def set_region(
+    def use_region(
         self,
         xlim: Optional[tuple[int, int]] = None,
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Set region of datacube used for fitting.
+        '''Use a region of datacube used for fitting.
+
+        Args:
+            xlim (Optional[tuple[int, int]], optional): The limit of the x-axis.
+                Defaults to None.
+            ylim (Optional[tuple[int, int]], optional): The limit of the y-axis.
+                Defaults to None.
+            vlim (Optional[tuple[int, int]], optional): The limit of the v-axis.
+                Defaults to None.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> tok.use_region((32, 96), (32, 96), (5, 12))
+
+        Note:
+            In ``uvfit``, the v-axis limit must be specified smaller than
+            original cube size, because ``uvfit`` estimates the noise level
+            using the pixels outside ``vlim``.
         '''
         self.datacube.cutout(xlim, ylim, vlim)
         if self.dirtybeam is not None:
@@ -223,7 +382,31 @@ class Tokult:
         if self.gravlens is not None:
             self.gravlens.match_wcs_with(self.datacube)
 
-    def set_datacube(
+    def use_redshifts(
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
+    ) -> None:
+        '''Set the redshifts of the source and the lens galaxies.
+
+        The redshifts are used to compute the gravitational lensing effects and
+        to convert the parameters to the physical units.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> tok.use_redshift(z_source=6.2, z_lens=0.9)
+        '''
+        if self.gravlens is not None:
+            self.gravlens.use_redshifts(z_lens, z_source, z_assumed)
+
+    def change_datacube(
         self,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
@@ -232,40 +415,64 @@ class Tokult:
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Set datacube into DataCube class.
+        '''Change the variable ``datacube``.
+
+        May be useful to change ``datacube`` of an instance.
         '''
         self.datacube = DataCube.create(
             data_or_fname, header=header, index_hdul=index_hdul
         )
-        self.set_region(xlim, ylim, vlim)
+        self.use_region(xlim, ylim, vlim)
 
-    def set_dirtybeam(
+    def change_dirtybeam(
         self,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
-        '''Set dirtybeam data into DirtyBeam class.
+        '''Change the variable ``dirtybeam``.
+
+        May be useful to change ``dirtybeam`` of an instance.
         '''
         self.dirtybeam = DirtyBeam.create(
             data_or_fname, header=header, index_hdul=index_hdul
         )
 
-    def set_gravlens(
+    def change_gravlens(
         self,
-        data_or_fname: Union[
-            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str]
-        ],
+        data_or_fname: Union[tuple[np.ndarray, ...], tuple[str, ...]],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
-        '''Set gravitational lensing data into GravLens class.
+        '''Change the variable ``gravlens``.
+
+        May be useful to change ``gravlens`` of an instance.
         '''
         g1, g2, k = data_or_fname
         self.gravlens = GravLens.create(g1, g2, k, header=header, index_hdul=index_hdul)
 
     def construct_modelcube(self, params: tuple[float, ...]) -> None:
-        '''Construct model cube using parameters.
+        '''Construct ``modelcube`` from the input parameters.
+
+        Construct a 3D model and set it to an internal variable ``modelcube``.
+        If you want to use a model outside ``Tokult`` instances, please use
+        ``ModelCube.create()`` instead.
+
+        Args:
+            params (tuple[float, ...]): Input parameters.
+
+        Returns:
+            None:
+
+        Examples:
+            Change a part of the best-fit parameters and construct the model.
+
+            >>> params = sol.best._replace(PA_dyn=0.0)
+            >>> tok.construct_modelcube(params)
+
+        Note:
+            This method needs the global parameters to be set already.
+            You may need to fit the data once, before using this method.
         '''
         datacube = self.datacube
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -278,8 +485,13 @@ class Tokult:
         )
 
     def calculate_normweight(self) -> float:
-        '''Calculate norm_weight, almost equal to sum-of-weight.
-        The obtained value is different from sum-of-weight by a factor of a few.
+        '''Calculate the normalization weight used in ``uvfit``.
+
+        The obtained value is almost equal to sum-of-weight, but different by a
+        factor of a few.
+
+        Returns:
+            float: The normalization weight
         '''
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
@@ -291,17 +503,20 @@ class Tokult:
         p = uvpsf[[v0 - 1, v1], :, :].real
         return 1.0 / n[p > -p.min()].std() ** 2
 
-    def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf
-    ) -> None:
-        '''Set redshifts for gravitational lensing and physical units.
-        '''
-        if self.gravlens is not None:
-            self.gravlens.use_redshifts(z_lens, z_source, z_assumed)
-
 
 class Cube(object):
-    '''Contains cube data and related methods.
+    '''3D data cube.
+
+    Examples:
+        >>>
+
+    Attributes:
+        imageplane (np.ndarray): Cutout 3D data cube on the image plane.
+        uvplane (np.ndarray): Cutout 3D data cube on the uv plane.
+            This is the Fourier transformation of ``imageplane``.
+        original (np.ndarray): Original-size, 3D data cube.
+        header (Optional[fits.Header]): Header of the fits data.
+            Defaults to None.
     '''
 
     def __init__(
@@ -336,7 +551,21 @@ class Cube(object):
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Create coordinates of data cube.
+        '''Cutout 3D cube from ``original``.
+
+        Args:
+            xlim (Optional[tuple[int, int]], optional): The limit of the x-axis.
+                Defaults to None.
+            ylim (Optional[tuple[int, int]], optional): The limit of the y-axis.
+                Defaults to None.
+            vlim (Optional[tuple[int, int]], optional): The limit of the v-axis.
+                Defaults to None.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> cube.cutout((32, 96), (32, 96), (5, 12))
         '''
         self.xlim = xlim if xlim else (0, self.original.shape[2])
         self.ylim = ylim if ylim else (0, self.original.shape[1])
@@ -354,38 +583,98 @@ class Cube(object):
         self.uvplane = self.rfft2(self.original[self.vslice, :, :], zero_padding=True)
 
     def rms(self, is_originalsize: bool = False) -> np.ndarray:
-        '''Return rms noise of the datacube.
+        '''Compute the rms noise of the data cube.
+
+        Compute the rms noise using pixels outside of the region used for
+        ``imageplane``, by assuming that the pixels are not affected by
+        any objects and reflect pure noises.
+
+        Args:
+            is_originalsize (bool, optional): If False, the computed rms noise is
+            limited at ``vlim`` of ``imageplane``. If True, the rms noise is
+            computed using the original-size data cube. Defaults to False.
+
+        Returns:
+            np.ndarray: the one-dimensional array containing the rms noises at
+            each pixel (channel) along the velocity axis.
+
+        Examples:
+            >>> rms = cube.rms()
+
+        Note:
+            This method may not return the correct rms if multiple objects are
+            detected in the Field of View.
         '''
         if is_originalsize:
             image = self.original
         else:
             image = self.original[self.vslice, :, :]
         maskedimage = np.copy(image)
-        maskedimage[:, self.yslice, self.xslice] = None
-        return misc.rms(maskedimage, axis=(1, 2))
+        maskedimage[:, self.yslice, self.xslice] = 0.0
+        rms = misc.rms(maskedimage, axis=(1, 2))
+        assert isinstance(rms, np.ndarray)
+        return rms
 
     def moment0(self, is_originalsize: bool = False) -> np.ndarray:
-        '''Return moment 0 maps using pixel indicies.
+        '''Moment-0 (integrated-flux) map.
+
+        The moment-0 map is the flux map integrated along the velocity axis.
+        The default computed area is the one defined by ``Cube.cutout()``.
+
+        Args:
+            is_originalsize (bool, optional): If False, compute the moment-0 map
+                using the cutout region. If True, using the original-size data.
+                Defaults to False.
+
+        Returns:
+            np.ndarray: Two-dimensional Moment-0 map.
+
+        Examples:
+            >>> mom0 = cube.moment0()
         '''
         if is_originalsize:
             return np.sum(self.original, axis=0)
         else:
             return np.sum(self.imageplane, axis=0)
 
-    def rms_moment0(self) -> float:
-        '''Return rms noise of the moment 0 map.
+    def rms_moment0(self, is_originalsize: bool = False) -> float:
+        '''RMS noise of the moment 0 map.
+
+        RMS noise is computed using the region outside the cutout region, where
+        the object is located.
+
+        Args:
+            is_originalsize (bool, optional): If False, the moment-0 map is
+                computed using the cutout region. If True, using the original-
+                size data. Defaults to False.
+
+        Returns:
+            float: rms of the moment-0 map.
         '''
-        maskedimage = self.moment0()
-        maskedimage[self.yslice, self.xslice] = None
-        sumsq = np.nansum(maskedimage ** 2)
-        n = np.count_nonzero(maskedimage)
-        return np.sqrt(sumsq / n)
+        if is_originalsize:
+            image = self.original
+        else:
+            image = self.original[self.vslice, :, :]
+        maskedimage = np.sum(image, axis=0)
+        maskedimage[self.yslice, self.xslice] = 0.0
+        rms = misc.rms(maskedimage)
+        assert isinstance(rms, float)
+        return rms
 
     def pixmoment1(self, thresh: float = 0.0) -> np.ndarray:
-        '''Return moment 1 maps using pixel indicies.
+        '''Moment-1 (velocity) map.
 
         This funciton uses pixel indicies instead of velocity; that is,
         the units of moment 1 is pixel.
+
+        Args:
+            thresh (float, optional): Defaults to 0.0.
+
+        Returns:
+            np.ndarray: [description]
+
+        Examples:
+            >>>
         '''
         mom0 = self.moment0()
         mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
