@@ -404,7 +404,7 @@ class Tokult:
             >>> tok.use_redshift(z_source=6.2, z_lens=0.9)
         '''
         if self.gravlens is not None:
-            self.gravlens.use_redshifts(z_lens, z_source, z_assumed)
+            self.gravlens.use_redshifts(z_source, z_lens, z_assumed)
 
     def change_datacube(
         self,
@@ -627,7 +627,7 @@ class Cube(object):
                 Defaults to False.
 
         Returns:
-            np.ndarray: Two-dimensional Moment-0 map.
+            np.ndarray: Two-dimensional moment-0 map.
 
         Examples:
             >>> mom0 = cube.moment0()
@@ -664,28 +664,49 @@ class Cube(object):
     def pixmoment1(self, thresh: float = 0.0) -> np.ndarray:
         '''Moment-1 (velocity) map.
 
-        This funciton uses pixel indicies instead of velocity; that is,
-        the units of moment 1 is pixel.
-
         Args:
-            thresh (float, optional): Defaults to 0.0.
+            thresh (float, optional): Threshold of the pixel values on the moment-
+            0 map. In the pixels below this threshold, ``np.nan`` is inserted.
+            Defaults to 0.0.
 
         Returns:
-            np.ndarray: [description]
+            np.ndarray: Two-dimensional moment-1 map.
 
         Examples:
-            >>>
+            To output pixels whose moment-0 values are two times higher than the
+            rms noise of the moment-0 map.
+
+            >>> mom1 = cube.pixmoment1(thresh=2 * cube.rms_moment0())
+        
+        Note:
+            The units of the moment-1 map is *pixel*. You may change the units
+            by multiplying the results by the velocity-bin width.
         '''
         mom0 = self.moment0()
         mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
-        mom1[mom0 <= thresh] = None
+        mom1[mom0 <= thresh] = np.nan
         return mom1
 
     def pixmoment2(self, thresh: float = 0.0) -> np.ndarray:
-        '''Return moment 1 maps using pixel indicies.
+        '''Moment-2 (velocity-dispersion) map.
 
-        This funciton uses pixel indicies instead of velocity; that is,
-        the units of moment 2 maps is pixel.
+        Args:
+            thresh (float, optional): Threshold of the pixel values on the moment-
+            0 map. In the pixels below this threshold, ``np.nan`` is inserted.
+            Defaults to 0.0.
+
+        Returns:
+            np.ndarray: Two-dimensional moment-2 map.
+
+        Examples:
+            To output pixels whose moment-0 values are two times higher than the
+            rms noise of the moment-0 map.
+
+            >>> mom2 = cube.pixmoment2(thresh=2 * cube.rms_moment0())
+        
+        Note:
+            The units of the moment-2 map is *pixel*. You may change the units
+            by multiplying the results by the velocity-bin width.
         '''
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
@@ -694,7 +715,7 @@ class Cube(object):
         mom2[mom0 <= thresh] = None
         return mom2
 
-    def get_pixmoments(
+    def _get_pixmoments(
         self, imom: int = 0, thresh: float = 0.0, recalc: bool = False
     ) -> np.ndarray:
         '''Return moment maps using pixel indicies.
@@ -721,7 +742,7 @@ class Cube(object):
                     return self.mom1
                 except AttributeError:
                     pass
-            mom0 = self.get_pixmoments(imom=0)
+            mom0 = self._get_pixmoments(imom=0)
             self.mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
             self.mom1[mom0 <= thresh] = None
             return self.mom1
@@ -731,7 +752,7 @@ class Cube(object):
                     return self.mom2
                 except AttributeError:
                     pass
-            mom1 = self.get_pixmoments(imom=1)
+            mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
             self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
@@ -749,7 +770,24 @@ class Cube(object):
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
     ):
-        '''Return noisy mock data cube.
+        '''Create a noisy mock data cube.
+
+        The noisy cube is created by adding noise to the contained 3D data cube.
+        This means that ``convolve`` should be the same as applied to the
+        contained data cube. This method is useful to perturb the data cube for
+        the Monte Carlo estiamtes of fitting errors.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS of the added noise cube. The rms
+                is computed at each pixel (channel) along the velocity axis.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the size of the noisy cube
+                the same as the cutout ``imageplane``. If True, the cube is the
+                original size. Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane. The
+                pixels with False are set to 0.0. Defaults to None.
         '''
         noise = self.create_noise(rms, self.original.shape, convolve, seed, uvcoverage)
         mock = self.original + noise
@@ -760,6 +798,19 @@ class Cube(object):
     @staticmethod
     def rfft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
         '''Wrapper of misc.rfft2.
+
+        This method add the new argument ``zero_padding`` for observed data.
+
+        Args:
+            data (np.ndarray): Data cube on the image plane.
+            zero_padding (bool, optional): If True, zero-padding the pixels with
+                ``None``. Defaults to False.
+
+        Returns:
+            np.ndarray: Fourier-transformed data cube on the uv plane.
+
+        Examples:
+            >>> uv = cube.rfft2(image, zero_padding=True)
         '''
         if np.any(idx := (np.logical_not(np.isfinite(data)))):
             if zero_padding:
@@ -777,7 +828,24 @@ class Cube(object):
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
+    ) -> np.ndarray:
+        '''Create a noise cube.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS noise of the cube.
+            shape (tuple[int, ...]): Shape of the cube.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Noise cube.
+
+        Examples:
+            >>> noise = cube.create_noise(rms, shape, func_convlution)
+        '''
         rng = default_rng(seed)
         noise = rng.standard_normal(size=shape)
         if convolve:
@@ -797,10 +865,27 @@ class DataCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
-        '''Return perturbed data cube.
+    ) -> np.ndarray:
+        '''Perturb the data cube with the same noise level and return it.
 
-        This function is mainly for Monte Carlo simulations.
+        This method is useful to perturb the data cube for the Monte Carlo
+        estiamtes of fitting errors.
+
+        Args:
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the output is the
+                perturbed ``imagepalne``. If True, the perturbed ``original``
+                Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Perturbed data cube.
+
+        Examples:
+            >>> cube_perturbed = datacube.perturbed(convolve=func_fullconvolve)
         '''
         rms = self.rms(is_originalsize=True)
         rms = rms[..., np.newaxis, np.newaxis]
@@ -813,7 +898,25 @@ class DataCube(Cube):
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> DataCube:
-        '''Constructer.
+        '''Constructer of ``DataCube``.
+
+        Args:
+            data_or_fname (Union[np.ndarray, str]): Data array or fits file name.
+            header (Optional[fits.Header], optional): Header of the fits file,
+                necessary if ``data_or_fname`` is a data array. Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            DataCube: Data cube.
+
+        Examples:
+            >>> datacube = DataCube.create('data.fits')
+
+        Note:
+            When the file name is give, the loaded data is squeezed; that is, the
+            axis with zero size is dropped. Specifically, the polarization axis of
+            the ALMA fits data may be dropped.
         '''
         if isinstance(data_or_fname, np.ndarray):
             return cls(data_or_fname, header)
@@ -829,7 +932,20 @@ class DataCube(Cube):
 
     @staticmethod
     def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
-        '''Read cube data from fits file.
+        '''Read a data cube from a fits file.
+
+        Args:
+            fname (str): Fits file name.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, fits.Header]: Tuple of the data and the fits header.
+
+        Note:
+            When the file name is give, the loaded data is squeezed; that is, the
+            axis with zero size is dropped. Specifically, the polarization axis of
+            the ALMA fits data may be dropped.
         '''
         with fits.open(fname) as hdul:
             # np.squeeze is needed to erase the polari axis.
@@ -840,6 +956,8 @@ class DataCube(Cube):
 
 class ModelCube(Cube):
     '''Cube class to contain a modeled datacube.
+    
+    This class is especially for the best-fit model cube.
     '''
 
     def __init__(
@@ -861,7 +979,24 @@ class ModelCube(Cube):
         lensing: Optional[Callable] = None,
         convolve: Optional[Callable] = None,
     ) -> ModelCube:
-        '''Constructer.
+        '''Constructer of ``ModelCube``.
+
+        Args:
+            params (tuple[float, ...]): Input parameters.
+            datacube (DataCube): Data cube. The size of the model cube is based on
+                this data cube.
+            lensing (Optional[Callable], optional): Lensing function.
+                Defaults to None.
+            convolve (Optional[Callable], optional): Convolving function.
+                Defaults to None.
+
+        Returns:
+            ModelCube: Model cube.
+
+        Examples:
+            >>> model = ModelCube.create(params, tok.datacube,
+                                         lensing=tok.gravlens.lensing,
+                                         convolve=tok.dirtybeam.fullconvolve)
         '''
         # shape = datacube.original.shape
         # x, y, v = (np.arange(shape[2]), np.arange(shape[1]), np.arange(shape[0]))
@@ -895,8 +1030,29 @@ class ModelCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
-        '''Return noisy mock data cube.
+    ) -> np.ndarray:
+        '''Convert to and output noisy mock cube.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS noise added to the model cube,
+                after convolution.
+            convolve (Optional[Callable], optional): Convolution function. This
+                convolve both *raw* model cube and noise. Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the output mock cube is
+                the same size as ``imageplane``. If True, the size is the same
+                as ``original``. Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Mock data cube.
+
+        Examples:
+            >>> mock = modelcube.to_mockcube(
+                           tok.datacube.rms(),
+                           tok.dirtybeam.fullconvolve,
+                           is_original=True)
         '''
         if self.raw is None:
             raise ValueError('Raw model is None.')
@@ -928,7 +1084,17 @@ class DirtyBeam:
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> DirtyBeam:
-        '''Constructer
+        '''Constructer of ``DirtyBeam``.
+
+        Args:
+            data_or_fname (Union[np.ndarray, str]): Data array or fits file name.
+            header (Optional[fits.Header], optional): Header of the fits file.
+                Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            DirtyBeam: instance of ``DirtyBeam``.
         '''
         if isinstance(data_or_fname, np.ndarray):
             return cls(data_or_fname, header)
@@ -943,7 +1109,20 @@ class DirtyBeam:
         raise TypeError(message)
 
     def convolve(self, image: np.ndarray) -> np.ndarray:
-        '''Convolve image with dirtybeam (psf).
+        '''Convolve ``imageplane`` with dirtybeam (psf) in two dimension.
+
+        Perform two-dimensional convolution at each pixel (channel) along the
+        velocity axis.
+
+        Args:
+            image (np.ndarray): Image to be convolved. Note that the size must be
+                the same as the attribute ``imageplane``.
+
+        Returns:
+            np.ndarray: 2D-convolved cube.
+
+        Examples:
+            >>> convolved_image = dirtybeam.convole(image)
         '''
         # s1 = np.arange(c.conf.kernel_num)
         # t1 = np.arange(c.conf.kernel_num)
@@ -969,7 +1148,32 @@ class DirtyBeam:
         uvcoverage: Optional[np.ndarray] = None,
         is_noise: bool = False,
     ) -> np.ndarray:
-        '''Convolve image with original-size dirtybeam (psf).
+        '''Convolve ``original`` with dirtybeam (psf) in two dimension.
+
+        Difference between ``convolve()`` and ``fullconvolve()`` is the size of
+        the input ``image``. This method ``fullconvolve`` treat the image with the
+        same size as the ``dirtybeam.original``.
+
+        Args:
+            image (np.ndarray): Image to be convolved. Note that the size must be
+                the same as the attribute ``original``.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+            is_noise (bool, optional): True if ``image`` is data. False if noise.
+                Defaults to False.
+
+        Returns:
+            np.ndarray: 2D-convolved cube.
+
+        Examples:
+            >>> convolved_image = dirtybeam.fullconvole(tok.modelcube.raw)
+
+            How to create convolved noise.
+            
+            >>> rng = numpy.random.default_rng()
+            >>> noise = rng.standard_normal(size=shape)
+            >>> noise = dirtybeam.fullconvolve(
+                            noise, uvcoverage=uvcoverage, is_noise=True)
         '''
         kernel = self.original
         dim = len(image.shape)
@@ -996,7 +1200,15 @@ class DirtyBeam:
         ylim: Union[tuple[int, int], slice],
         vlim: Union[tuple[int, int], slice],
     ) -> None:
-        '''Cutout a cubic region from the dirty beam map.
+        '''Cutout a cubic region from the dirty beam cube.
+
+        Args:
+            xlim (Union[tuple[int, int], slice]): The limit of the x-axis.
+            ylim (Union[tuple[int, int], slice]): The limit of the y-axis.
+            vlim (Union[tuple[int, int], slice]): The limit of the v-axis.
+
+        Returns:
+            None:
         '''
         xslice = slice(*xlim) if isinstance(xlim, tuple) else xlim
         yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
@@ -1005,24 +1217,40 @@ class DirtyBeam:
         self.uvplane = misc.rfft2(self.original[vslice, :, :])
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
-        '''Cutout a cubic region from the dirty beam map.
+        '''Cutout a region with the same size of the input ``cube``.
+
+        Args:
+            cube (DataCube): Datacube. The size of ``cube.original`` must be the
+                same as the ``dirtybeam.original``. This method makes the size of
+                the ``dirtybeam.imageplane`` the same as ``cube.imageplane``.
+
+        Returns:
+            None:
         '''
         _, ysize, xsize = self.original.shape
         xlen = cube.xlim[1] - cube.xlim[0]
         ylen = cube.ylim[1] - cube.ylim[0]
-        xslice = self.get_slice_at_center(xsize, xlen)
-        yslice = self.get_slice_at_center(ysize, ylen)
+        xslice = self._get_slice_at_center(xsize, xlen)
+        yslice = self._get_slice_at_center(ysize, ylen)
         vslice = cube.vslice
         self.cutout(xslice, yslice, vslice)
 
     @staticmethod
     def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
-        '''Read dirtybeam from fits file.
+        '''Read the dirty beam from a fits file.
+
+        Args:
+            fname (str): Fits file name.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, fits.Header]: Tuple of the data and the fits header.
 
         CAUTION:
-        The data shape of dirtybeam must be the same as the datacube (cubeimage).
-        This requirement is naturaly satisfied if input dirtybeam and cubeimage fits
-        files are simulationsly created.
+            The data shape of ``DirtyBeam`` must be the same as the ``Datacube``.
+            This requirement is naturaly satisfied if the input dirty-beam and
+            the image-cube fits files are simulationsly created with CASA.
         '''
         with fits.open(fname) as hdul:
             beam = hdul[index_hdul].data
@@ -1030,8 +1258,18 @@ class DirtyBeam:
         return np.squeeze(beam), header
 
     @staticmethod
-    def get_slice_at_center(len_original: int, len_sub: int) -> slice:
+    def _get_slice_at_center(len_original: int, len_sub: int) -> slice:
         '''Get a central slice of the original array.
+
+        This submethod aims to give a slice whose center is always identical to
+        the center of the cube (i.e, dirty beam).
+
+        Args:
+            len_original (int): Length of the data cube.
+            len_sub (int): Length of the cutout image.
+
+        Returns:
+            slice: Slice around the center.
         '''
         if len_original % 2 == 0:  # even
             margin_end = (len_original - len_sub) // 2
@@ -1083,7 +1321,23 @@ class GravLens:
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> GravLens:
-        '''Constructer
+        '''Constructer of ``GravLens``.
+
+        Args:
+            data_or_fname_gamma1 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma1.
+            data_or_fname_gamma2 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma2.
+            data_or_fname_kappa (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, kappa.
+            header (Optional[fits.Header], optional): Header of the fits file.
+                This method assumes that lensing parameter maps, gamma1, gamma2,
+                and kappa, have the same size and coordinates. Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            GravLens: Instance of ``GravLens``.
         '''
         if not (
             isinstance(data_or_fname_gamma1, type(data_or_fname_gamma2))
@@ -1126,14 +1380,27 @@ class GravLens:
     def lensing(self, coordinates: np.ndarray) -> np.ndarray:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
-        This method use gravitational lensing parameters: gamma1, gamma2, and kappa.
-        coordinates: position array including (x, y).
-        shape: (n, m, 2) and shape of x: (n, m)
+        Args:
+            coordinates (np.ndarray): Array of the x and y coordinates on the
+                image plane. The shape of the array is (n, m, 2), where (n, m) is
+                the shape of x (or y) and x and y have been already concatenated,
+                so "2" appears.
+
+        Returns:
+            np.ndarray: Coordinates on the source plane. The array shape is
+                (n, m, 2)
+
+        Examples:
+            >>> coord_image = np.moveaxis(np.array([xx, yy]), 0, -1)
+            >>> coord_source = lensing(coord_image)
         '''
         return np.squeeze(self.jacob @ coordinates[..., np.newaxis], -1)
 
     def get_jacob(self) -> np.ndarray:
-        '''Get jacobian
+        '''Get Jacobian of the lensing equation.
+
+        Returns:
+            np.ndarray: Jacobian
         '''
         g1 = self.gamma1
         g2 = self.gamma2
@@ -1147,7 +1414,21 @@ class GravLens:
         return jacob
 
     def match_wcs_with(self, cube: DataCube) -> None:
-        '''Match the world coordinate system with input data.
+        '''Match the world coordinate system with the input data cube.
+
+        Use the wcs of ``cube.imageplane``; therefore, the matched lensing 
+        parameter map become smaller than the original map.
+
+        Args:
+            cube (DataCube): ``DataCube`` including the header information. This
+                method uses the wcs included in the header of the data cube and
+                the ``GravLens`` instance.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> gravlens.match_wcs_with(datacube)
         '''
         assert self.header is not None
         wcs_cube = wcs.WCS(cube.header)
@@ -1166,15 +1447,25 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self, z_lens: float, z_source: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
     ) -> None:
-        '''Correct lensing parameters with the redshifts.
+        '''Correct the lensing parameters using the redshifts.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            None:
         '''
         self.z_lens = z_lens
         self.z_source = z_source
         self.z_assumed = z_assumed
         self.distance_ratio = self.get_angular_distance_ratio(
-            z_lens, z_source, z_assumed
+            z_source, z_lens, z_assumed
         )
         self.gamma1 = self.gamma1_cutout * self.distance_ratio
         self.gamma2 = self.gamma2_cutout * self.distance_ratio
@@ -1182,7 +1473,7 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def reset_redshifts(self) -> None:
-        '''Reset redshifts.
+        '''Reset the redshift infomation.
         '''
         self.z_lens = None
         self.z_source = None
@@ -1194,16 +1485,37 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def magnification(self) -> np.ndarray:
-        '''Get magnification factor.
+        '''Get magnification factor using the lensing parameters.
+
+        Returns:
+            np.ndarray: Magnification map.
         '''
         gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
     def get_angular_distance_ratio(
-        z_lens: float, z_source: float, z_assumed: float = np.inf
+        z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> float:
-        '''Angular distance ratio between D_LS and D_S.
+        '''Angular distance ratio of D_LS to D_S, normalized by assumed D_LS/D_S.
+
+        Lensing parameter maps are distributed using some D_LS/D_S at specific
+        redshifts. This method provides a new factor that can be multiplied by
+        the lensing parameter maps to correct the redshift dependency.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            float: Angular distance ratio, D_LS/D_S
+
+        Examples:
+            >>> distance_ratio = gravlens.get_angular_distance_ratio(6.2, 0.9)
+            >>> gamma1_new = gamma1_old * distance_ratio
         '''
         D_S = c.cosmo.angular_diameter_distance(z_source)
         D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
@@ -1220,6 +1532,17 @@ class GravLens:
         fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
+
+        Args:
+            fname_gamma1 (str): Fits file name of the gamma1 map.
+            fname_gamma2 (str): Fits file name of the gamma2 map.
+            fname_kappa (str): Fits file name of the kappa map.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Assumes that all the fits files include the lensing parameter maps
+                at the same extension index. Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]: [description]
         '''
         with fits.open(fname_gamma1) as hdul:
             gamma1 = hdul[index_hdul].data

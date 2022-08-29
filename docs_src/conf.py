@@ -32,9 +32,10 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'sphinx_rtd_theme'
 rst_prolog = '''
-:github_url: https://github.com/sugayu/sample_hello/
+:github_url: https://github.com/sugayu/tokult/
 
 '''
 html_static_path = ['_static']
 autodoc_member_order = 'bysource'
+autodoc_typehints = 'description'
 autodoc_type_aliases = {'ArrayLike': 'ArrayLike'}
