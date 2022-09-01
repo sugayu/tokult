@@ -32,7 +32,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 html_theme = 'sphinx_rtd_theme'
 rst_prolog = '''
-:github_url: https://github.com/sugayu/tokult/
+:github_url: https://github.com/sugayu/tokult/tree/dev
 
 '''
 html_static_path = ['_static']

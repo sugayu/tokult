@@ -677,7 +677,7 @@ class Cube(object):
             rms noise of the moment-0 map.
 
             >>> mom1 = cube.pixmoment1(thresh=2 * cube.rms_moment0())
-        
+
         Note:
             The units of the moment-1 map is *pixel*. You may change the units
             by multiplying the results by the velocity-bin width.
@@ -703,7 +703,7 @@ class Cube(object):
             rms noise of the moment-0 map.
 
             >>> mom2 = cube.pixmoment2(thresh=2 * cube.rms_moment0())
-        
+
         Note:
             The units of the moment-2 map is *pixel*. You may change the units
             by multiplying the results by the velocity-bin width.
@@ -956,7 +956,7 @@ class DataCube(Cube):
 
 class ModelCube(Cube):
     '''Cube class to contain a modeled datacube.
-    
+
     This class is especially for the best-fit model cube.
     '''
 
@@ -1169,7 +1169,7 @@ class DirtyBeam:
             >>> convolved_image = dirtybeam.fullconvole(tok.modelcube.raw)
 
             How to create convolved noise.
-            
+
             >>> rng = numpy.random.default_rng()
             >>> noise = rng.standard_normal(size=shape)
             >>> noise = dirtybeam.fullconvolve(
@@ -1416,7 +1416,7 @@ class GravLens:
     def match_wcs_with(self, cube: DataCube) -> None:
         '''Match the world coordinate system with the input data cube.
 
-        Use the wcs of ``cube.imageplane``; therefore, the matched lensing 
+        Use the wcs of ``cube.imageplane``; therefore, the matched lensing
         parameter map become smaller than the original map.
 
         Args:

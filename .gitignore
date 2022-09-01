@@ -1,3 +1,4 @@
 *.last
 /tokult/__pycache__/
-*.fits
+/tokult/*.fits
+docs_src/obipy-resources/
