@@ -558,7 +558,7 @@ class InputParams(NamedTuple):
     '''Input parameters for construct_model_at_imageplane.
     '''
 
-    x0_dyn: float
+    x0_dyn: float  #: the coordinate on x-axis
     y0_dyn: float
     PA_dyn: float
     inclination_dyn: float
@@ -800,8 +800,8 @@ def initialize_globalparameters_for_image(
     cube = np.copy(datacube.imageplane)
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
+    mask = mask_for_fit
     if mask_for_fit is not None:
-        mask = mask_for_fit
         cube = cube[mask_for_fit]
         cube_error = np.broadcast_to(cube_error, cube.shape)
         cube_error = cube_error[mask_for_fit]
@@ -978,7 +978,7 @@ def initialguess(
     if not is_separate:
         param1[5] = param0[0]
         param1[6] = param0[1]
-        # param1[4] = param0[2]  # PA should come from dynamics...?
+        param0[2] = param1[4]  # PA should come from dynamics...?
         param1[0] = param0[3]
         param1[1] = param0[4]
 

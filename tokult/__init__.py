@@ -1,5 +1,7 @@
-"""tokult --- Tools of Kinematics on UV-plane for Lensed Targets
-"""
+'''Tokult --- Tools of Kinematics on UV-plane for Lensed Targets
+
+Tokult is a kinematics fitting tool.
+'''
 from .__version import __version__
 from . import core
 from .core import *  # noqa

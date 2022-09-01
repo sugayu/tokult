@@ -13,6 +13,8 @@ import logging
 from logging.config import dictConfig
 from configparser import ConfigParser
 
+__all__: list = []
+
 
 ##
 @dataclass(frozen=True)

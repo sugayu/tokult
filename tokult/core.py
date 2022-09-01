@@ -11,14 +11,26 @@ from . import common as c
 from . import fitting
 from . import misc
 
-__all__ = ['Tokult', 'DataCube', 'ModelCube', 'DirtyBeam', 'GravLens']
+__all__ = ['Tokult', 'Cube', 'DataCube', 'ModelCube', 'DirtyBeam', 'GravLens']
 
 
 ##
 class Tokult:
-    '''Main class in tokult package.
+    '''Interface of Tokult.
 
-    Users manage tokult methods via this class.
+    Users specify data to launch an instance object and start fitting through
+    the instance. This class contains observed data, psf, and lensing parameters,
+    along with useful functions to manipulate data and models.
+
+    Args:
+        datacube (DataCube):
+        dirtybeam (Optional[DirtyBeam], optional): Defaults to None.
+        gravlens (Optional[GravLens], optional): Defaults to None.
+
+    Examples:
+        >>> import tokult
+        >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
+                                       ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
     '''
 
     def __init__(
@@ -37,17 +49,47 @@ class Tokult:
         cls,
         data: Union[np.ndarray, str],
         beam: Union[np.ndarray, str, None] = None,
-        gravlens: Union[
-            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str], None
-        ] = None,
+        gravlens: Union[tuple[np.ndarray, ...], tuple[str, ...], None] = None,
         header_data: Optional[fits.Header] = None,
         header_beam: Optional[fits.Header] = None,
         header_gamma: Optional[fits.Header] = None,
         index_data: int = 0,
         index_beam: int = 0,
         index_gamma: int = 0,
-    ):
-        '''Constructer of Tokult.
+    ) -> Tokult:
+        '''Constructer of ``Tokult``.
+
+        Construct an instance easier than to use the init constructer.
+
+        Args:
+            data (Union[np.ndarray, str]): Observed data. The format is a data array or
+                a fits file name.
+            beam (Union[np.ndarray, str, None], optional): Dirty beam or point spread
+                function (PSF). The format is a data array or a fits file name.
+                Defaults to None.
+            gravlens (Union[tuple[np.ndarray, ...], tuple[str, ...]], None, optional):
+                Gravitational lensing parameters. The format is a tuple containing
+                the three data array or fits file names of parameters: gamma1, gamma2,
+                and kappa. Defaults to None.
+            header_data (Optional[fits.Header], optional): Header of data.
+                Defaults to None.
+                This is necessary when the ``data`` is not given in a fits file.
+            header_beam (Optional[fits.Header], optional): Header of psf.
+                Defaults to None.
+                This is necessary when ``beam`` is not given in a fits file.
+            header_gamma (Optional[fits.Header], optional): Header of gamma.
+                Defaults to None.
+                This is necessary when ``gravlens`` is not given in fits files.
+            index_data (int, optional): Index of fits extensions of the data fits file.
+                Defaults to 0.
+            index_beam (int, optional): Index of fits extensions of the beam fits file.
+                Defaults to 0.
+            index_gamma (int, optional): Index of fits extensions of the lens fits
+                files. Defaults to 0.
+
+        Examples:
+            >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
+                                           ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
         '''
         datacube = DataCube.create(data, header=header_data, index_hdul=index_data)
 
@@ -72,18 +114,53 @@ class Tokult:
         self,
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
+        fix: Optional[fitting.FixParams] = None,
+        optimization: str = 'mc',
         niter: int = 1,
         nperturb: int = 1000,
-        fix: Optional[fitting.FixParams] = None,
-        is_separate: bool = False,
-        mask_for_fit: Optional[np.ndarray] = None,
-        optimization: str = 'mcmc',
         nwalkers: int = 64,
         nsteps: int = 5000,
         pool: Optional[Pool] = None,
+        is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
-        '''First main function to fit 3d model to data cube on image plane.
+        '''Fit a 3d model to the data cube on the image plane.
+
+        Args:
+            init (Sequence[float]): Initial parameters of fitting.
+            bound (Optional[tuple[Sequence[float], Sequence[float]], optional):
+                Boundaries of parameters. Defaults to None.
+                When None is given, the default parameter boundaries are used.
+                The boundaries can be easily set using ``get_bound_params``.
+                Currently, in the mcmc method, only flat prior distributions
+                are available through this argument.
+            fix (Optional[fitting.FixParams], optional): Defaults to None.
+            optimization (str, optional): Defaults to 'mc'.
+            niter (int, optional): Number of iterations of fitting, used
+                in the least square method. Defaults to 1.
+            nperturb (int, optional): Number of perturbations in the Monte Carlo
+                method. Defaults to 1000.
+            nwalkers (int, optional): Number of walkers, used in the MCMC method.
+                Defaults to 64.
+            nsteps (int, optional): Number of steps, used in the MCMC method.
+                Defaults to 5000.
+            pool (Optional[Pool], optional): multiprocessing.pool for a multi-process
+                MCMC fitting. Defaults to None.
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+            mask_for_fit (Optional[np.ndarray], optional): Mask specifying pixels
+                used for fitting. Defaults to None.
+            progressbar (bool, optional): If True, a progress bar is shown.
+                Defaults to False.
+
+        Returns:
+            fitting.Solution: Fitting results and related parameters.
+
+        Examples:
+            >>> sol = tok.imagefit(init, bound, optimization='mc')
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -143,23 +220,66 @@ class Tokult:
         init: Sequence[float],
         bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
         fix: Optional[fitting.FixParams] = None,
-        niter: int = 1,
-        is_separate: bool = False,
-        mask_for_fit: Optional[np.ndarray] = None,
         optimization: str = 'mcmc',
+        niter: int = 1,
         nwalkers: int = 64,
         nsteps: int = 5000,
-        nprocesses: int = 12,
         pool: Optional[Pool] = None,
+        is_separate: bool = False,
+        mask_for_fit: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
-        '''Second main function to fit 3d model to data cube on uv plane.
+        '''Fit a 3d model to the data cube on the uv plane.
+
+        Args:
+            init (Sequence[float]): Initial parameters of fitting.
+                a function to guess initial parameters: ``tokult.initialguess()``.
+            bound (Optional[tuple[Sequence[float], Sequence[float]], optional):
+                Boundaries of parameters. Defaults to None.
+                When None is given, the default parameter boundaries are used.
+                The boundaries can be easily set using ``get_bound_params``.
+                Currently, in the mcmc method, only flat prior distributions
+                are available through this argument.
+            fix (Optional[fitting.FixParams], optional): Fix parameters during
+                fitting. See ``FixParams``. Defaults to None.
+            optimization (str, optional): Method to optimize the 3D model.
+                - 'ls': least square method.
+                - 'mcmc': Malcov Chain Monte Carlo method.
+                Defaults to 'mcmc'.
+            niter (int, optional): Number of iterations of fitting, used
+                in the least square method. Defaults to 1.
+            nperturb (int, optional): Number of perturbations in the Monte Carlo
+                method. Defaults to 1000.
+            nwalkers (int, optional): Number of walkers, used in the MCMC method.
+                Defaults to 64.
+            nsteps (int, optional): Number of steps, used in the MCMC method.
+                Defaults to 5000.
+            pool (Optional[Pool], optional): multiprocessing.pool for a multi-process
+                MCMC fitting. Defaults to None.
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+            mask_for_fit (Optional[np.ndarray], optional): Mask specifying pixels
+                used for fitting. In uv fitting, specifying the uv-coverage is
+                important, which is passed through this argument. Defaults to None.
+            progressbar (bool, optional): If True, a progress bar is shown.
+                Defaults to False.
+
+        Returns:
+            fitting.Solution: Fitting results and related parameters.
+
+        Examples:
+            >>> sol = tok.uvfit(init, bound, optimization='mcmc')
+
+        Note:
+            The input parameters are the same as ``imagefit``.
         '''
         if self.dirtybeam:
             beam_visibility = self.dirtybeam.uvplane
             norm_weight = self.calculate_normweight()
         else:
-            msg = '"DirtyBeam" is necessarily for uvfit.'
+            msg = '"DirtyBeam" is necessary for uvfit.'
             c.logger.warning(msg)
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -202,6 +322,26 @@ class Tokult:
 
     def initialguess(self, is_separate: bool = False) -> fitting.InputParams:
         '''Guess initial input parameters for fitting.
+
+        Fit tow-dimensional moment-0 (flux) map and moment-1 (velocity) map then
+        Estimate input parameters from the 2-d fitting results.
+
+        Args:
+            is_separate (bool, optional): If True, parameters regarding kinematics
+                and emission are separated; and thus fitting uses all the 14
+                parameters. If False, the parameters are the same and
+                the number of free parameters are reduced. Defaults to False.
+
+        Returns:
+            fitting.InputParams: Best-guessed input parameters.
+
+        Examples:
+            >>> init = tok.initialguess()
+
+        Note:
+            Initial parameters are crucial for parameter fitting, especially in
+            the least-square and Monte Carlo methods and being related with speed
+            of convergence in the MCMC method.
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -209,13 +349,32 @@ class Tokult:
             self.datacube, func_convolve, func_lensing, is_separate
         )
 
-    def set_region(
+    def use_region(
         self,
         xlim: Optional[tuple[int, int]] = None,
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Set region of datacube used for fitting.
+        '''Use a region of datacube used for fitting.
+
+        Args:
+            xlim (Optional[tuple[int, int]], optional): The limit of the x-axis.
+                Defaults to None.
+            ylim (Optional[tuple[int, int]], optional): The limit of the y-axis.
+                Defaults to None.
+            vlim (Optional[tuple[int, int]], optional): The limit of the v-axis.
+                Defaults to None.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> tok.use_region((32, 96), (32, 96), (5, 12))
+
+        Note:
+            In ``uvfit``, the v-axis limit must be specified smaller than
+            original cube size, because ``uvfit`` estimates the noise level
+            using the pixels outside ``vlim``.
         '''
         self.datacube.cutout(xlim, ylim, vlim)
         if self.dirtybeam is not None:
@@ -223,7 +382,31 @@ class Tokult:
         if self.gravlens is not None:
             self.gravlens.match_wcs_with(self.datacube)
 
-    def set_datacube(
+    def use_redshifts(
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
+    ) -> None:
+        '''Set the redshifts of the source and the lens galaxies.
+
+        The redshifts are used to compute the gravitational lensing effects and
+        to convert the parameters to the physical units.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> tok.use_redshift(z_source=6.2, z_lens=0.9)
+        '''
+        if self.gravlens is not None:
+            self.gravlens.use_redshifts(z_source, z_lens, z_assumed)
+
+    def change_datacube(
         self,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
@@ -232,40 +415,64 @@ class Tokult:
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Set datacube into DataCube class.
+        '''Change the variable ``datacube``.
+
+        May be useful to change ``datacube`` of an instance.
         '''
         self.datacube = DataCube.create(
             data_or_fname, header=header, index_hdul=index_hdul
         )
-        self.set_region(xlim, ylim, vlim)
+        self.use_region(xlim, ylim, vlim)
 
-    def set_dirtybeam(
+    def change_dirtybeam(
         self,
         data_or_fname: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
-        '''Set dirtybeam data into DirtyBeam class.
+        '''Change the variable ``dirtybeam``.
+
+        May be useful to change ``dirtybeam`` of an instance.
         '''
         self.dirtybeam = DirtyBeam.create(
             data_or_fname, header=header, index_hdul=index_hdul
         )
 
-    def set_gravlens(
+    def change_gravlens(
         self,
-        data_or_fname: Union[
-            tuple[np.ndarray, np.ndarray, np.ndarray], tuple[str, str, str]
-        ],
+        data_or_fname: Union[tuple[np.ndarray, ...], tuple[str, ...]],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
-        '''Set gravitational lensing data into GravLens class.
+        '''Change the variable ``gravlens``.
+
+        May be useful to change ``gravlens`` of an instance.
         '''
         g1, g2, k = data_or_fname
         self.gravlens = GravLens.create(g1, g2, k, header=header, index_hdul=index_hdul)
 
     def construct_modelcube(self, params: tuple[float, ...]) -> None:
-        '''Construct model cube using parameters.
+        '''Construct ``modelcube`` from the input parameters.
+
+        Construct a 3D model and set it to an internal variable ``modelcube``.
+        If you want to use a model outside ``Tokult`` instances, please use
+        ``ModelCube.create()`` instead.
+
+        Args:
+            params (tuple[float, ...]): Input parameters.
+
+        Returns:
+            None:
+
+        Examples:
+            Change a part of the best-fit parameters and construct the model.
+
+            >>> params = sol.best._replace(PA_dyn=0.0)
+            >>> tok.construct_modelcube(params)
+
+        Note:
+            This method needs the global parameters to be set already.
+            You may need to fit the data once, before using this method.
         '''
         datacube = self.datacube
         func_lensing = self.gravlens.lensing if self.gravlens else None
@@ -278,8 +485,13 @@ class Tokult:
         )
 
     def calculate_normweight(self) -> float:
-        '''Calculate norm_weight, almost equal to sum-of-weight.
-        The obtained value is different from sum-of-weight by a factor of a few.
+        '''Calculate the normalization weight used in ``uvfit``.
+
+        The obtained value is almost equal to sum-of-weight, but different by a
+        factor of a few.
+
+        Returns:
+            float: The normalization weight
         '''
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
@@ -291,17 +503,20 @@ class Tokult:
         p = uvpsf[[v0 - 1, v1], :, :].real
         return 1.0 / n[p > -p.min()].std() ** 2
 
-    def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf
-    ) -> None:
-        '''Set redshifts for gravitational lensing and physical units.
-        '''
-        if self.gravlens is not None:
-            self.gravlens.use_redshifts(z_lens, z_source, z_assumed)
-
 
 class Cube(object):
-    '''Contains cube data and related methods.
+    '''3D data cube.
+
+    Examples:
+        >>>
+
+    Attributes:
+        imageplane (np.ndarray): Cutout 3D data cube on the image plane.
+        uvplane (np.ndarray): Cutout 3D data cube on the uv plane.
+            This is the Fourier transformation of ``imageplane``.
+        original (np.ndarray): Original-size, 3D data cube.
+        header (Optional[fits.Header]): Header of the fits data.
+            Defaults to None.
     '''
 
     def __init__(
@@ -336,7 +551,21 @@ class Cube(object):
         ylim: Optional[tuple[int, int]] = None,
         vlim: Optional[tuple[int, int]] = None,
     ) -> None:
-        '''Create coordinates of data cube.
+        '''Cutout 3D cube from ``original``.
+
+        Args:
+            xlim (Optional[tuple[int, int]], optional): The limit of the x-axis.
+                Defaults to None.
+            ylim (Optional[tuple[int, int]], optional): The limit of the y-axis.
+                Defaults to None.
+            vlim (Optional[tuple[int, int]], optional): The limit of the v-axis.
+                Defaults to None.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> cube.cutout((32, 96), (32, 96), (5, 12))
         '''
         self.xlim = xlim if xlim else (0, self.original.shape[2])
         self.ylim = ylim if ylim else (0, self.original.shape[1])
@@ -354,49 +583,130 @@ class Cube(object):
         self.uvplane = self.rfft2(self.original[self.vslice, :, :], zero_padding=True)
 
     def rms(self, is_originalsize: bool = False) -> np.ndarray:
-        '''Return rms noise of the datacube.
+        '''Compute the rms noise of the data cube.
+
+        Compute the rms noise using pixels outside of the region used for
+        ``imageplane``, by assuming that the pixels are not affected by
+        any objects and reflect pure noises.
+
+        Args:
+            is_originalsize (bool, optional): If False, the computed rms noise is
+            limited at ``vlim`` of ``imageplane``. If True, the rms noise is
+            computed using the original-size data cube. Defaults to False.
+
+        Returns:
+            np.ndarray: the one-dimensional array containing the rms noises at
+            each pixel (channel) along the velocity axis.
+
+        Examples:
+            >>> rms = cube.rms()
+
+        Note:
+            This method may not return the correct rms if multiple objects are
+            detected in the Field of View.
         '''
         if is_originalsize:
             image = self.original
         else:
             image = self.original[self.vslice, :, :]
         maskedimage = np.copy(image)
-        maskedimage[:, self.yslice, self.xslice] = None
-        return misc.rms(maskedimage, axis=(1, 2))
+        maskedimage[:, self.yslice, self.xslice] = 0.0
+        rms = misc.rms(maskedimage, axis=(1, 2))
+        assert isinstance(rms, np.ndarray)
+        return rms
 
     def moment0(self, is_originalsize: bool = False) -> np.ndarray:
-        '''Return moment 0 maps using pixel indicies.
+        '''Moment-0 (integrated-flux) map.
+
+        The moment-0 map is the flux map integrated along the velocity axis.
+        The default computed area is the one defined by ``Cube.cutout()``.
+
+        Args:
+            is_originalsize (bool, optional): If False, compute the moment-0 map
+                using the cutout region. If True, using the original-size data.
+                Defaults to False.
+
+        Returns:
+            np.ndarray: Two-dimensional moment-0 map.
+
+        Examples:
+            >>> mom0 = cube.moment0()
         '''
         if is_originalsize:
             return np.sum(self.original, axis=0)
         else:
             return np.sum(self.imageplane, axis=0)
 
-    def rms_moment0(self) -> float:
-        '''Return rms noise of the moment 0 map.
+    def rms_moment0(self, is_originalsize: bool = False) -> float:
+        '''RMS noise of the moment 0 map.
+
+        RMS noise is computed using the region outside the cutout region, where
+        the object is located.
+
+        Args:
+            is_originalsize (bool, optional): If False, the moment-0 map is
+                computed using the cutout region. If True, using the original-
+                size data. Defaults to False.
+
+        Returns:
+            float: rms of the moment-0 map.
         '''
-        maskedimage = self.moment0()
-        maskedimage[self.yslice, self.xslice] = None
-        sumsq = np.nansum(maskedimage ** 2)
-        n = np.count_nonzero(maskedimage)
-        return np.sqrt(sumsq / n)
+        if is_originalsize:
+            image = self.original
+        else:
+            image = self.original[self.vslice, :, :]
+        maskedimage = np.sum(image, axis=0)
+        maskedimage[self.yslice, self.xslice] = 0.0
+        rms = misc.rms(maskedimage)
+        assert isinstance(rms, float)
+        return rms
 
     def pixmoment1(self, thresh: float = 0.0) -> np.ndarray:
-        '''Return moment 1 maps using pixel indicies.
+        '''Moment-1 (velocity) map.
 
-        This funciton uses pixel indicies instead of velocity; that is,
-        the units of moment 1 is pixel.
+        Args:
+            thresh (float, optional): Threshold of the pixel values on the moment-
+            0 map. In the pixels below this threshold, ``np.nan`` is inserted.
+            Defaults to 0.0.
+
+        Returns:
+            np.ndarray: Two-dimensional moment-1 map.
+
+        Examples:
+            To output pixels whose moment-0 values are two times higher than the
+            rms noise of the moment-0 map.
+
+            >>> mom1 = cube.pixmoment1(thresh=2 * cube.rms_moment0())
+
+        Note:
+            The units of the moment-1 map is *pixel*. You may change the units
+            by multiplying the results by the velocity-bin width.
         '''
         mom0 = self.moment0()
         mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
-        mom1[mom0 <= thresh] = None
+        mom1[mom0 <= thresh] = np.nan
         return mom1
 
     def pixmoment2(self, thresh: float = 0.0) -> np.ndarray:
-        '''Return moment 1 maps using pixel indicies.
+        '''Moment-2 (velocity-dispersion) map.
 
-        This funciton uses pixel indicies instead of velocity; that is,
-        the units of moment 2 maps is pixel.
+        Args:
+            thresh (float, optional): Threshold of the pixel values on the moment-
+            0 map. In the pixels below this threshold, ``np.nan`` is inserted.
+            Defaults to 0.0.
+
+        Returns:
+            np.ndarray: Two-dimensional moment-2 map.
+
+        Examples:
+            To output pixels whose moment-0 values are two times higher than the
+            rms noise of the moment-0 map.
+
+            >>> mom2 = cube.pixmoment2(thresh=2 * cube.rms_moment0())
+
+        Note:
+            The units of the moment-2 map is *pixel*. You may change the units
+            by multiplying the results by the velocity-bin width.
         '''
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
@@ -405,7 +715,7 @@ class Cube(object):
         mom2[mom0 <= thresh] = None
         return mom2
 
-    def get_pixmoments(
+    def _get_pixmoments(
         self, imom: int = 0, thresh: float = 0.0, recalc: bool = False
     ) -> np.ndarray:
         '''Return moment maps using pixel indicies.
@@ -432,7 +742,7 @@ class Cube(object):
                     return self.mom1
                 except AttributeError:
                     pass
-            mom0 = self.get_pixmoments(imom=0)
+            mom0 = self._get_pixmoments(imom=0)
             self.mom1 = np.sum(self.imageplane * self.vgrid, axis=0) / mom0
             self.mom1[mom0 <= thresh] = None
             return self.mom1
@@ -442,7 +752,7 @@ class Cube(object):
                     return self.mom2
                 except AttributeError:
                     pass
-            mom1 = self.get_pixmoments(imom=1)
+            mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
             self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
@@ -460,7 +770,24 @@ class Cube(object):
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
     ):
-        '''Return noisy mock data cube.
+        '''Create a noisy mock data cube.
+
+        The noisy cube is created by adding noise to the contained 3D data cube.
+        This means that ``convolve`` should be the same as applied to the
+        contained data cube. This method is useful to perturb the data cube for
+        the Monte Carlo estiamtes of fitting errors.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS of the added noise cube. The rms
+                is computed at each pixel (channel) along the velocity axis.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the size of the noisy cube
+                the same as the cutout ``imageplane``. If True, the cube is the
+                original size. Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane. The
+                pixels with False are set to 0.0. Defaults to None.
         '''
         noise = self.create_noise(rms, self.original.shape, convolve, seed, uvcoverage)
         mock = self.original + noise
@@ -471,6 +798,19 @@ class Cube(object):
     @staticmethod
     def rfft2(data: np.ndarray, zero_padding: bool = False) -> np.ndarray:
         '''Wrapper of misc.rfft2.
+
+        This method add the new argument ``zero_padding`` for observed data.
+
+        Args:
+            data (np.ndarray): Data cube on the image plane.
+            zero_padding (bool, optional): If True, zero-padding the pixels with
+                ``None``. Defaults to False.
+
+        Returns:
+            np.ndarray: Fourier-transformed data cube on the uv plane.
+
+        Examples:
+            >>> uv = cube.rfft2(image, zero_padding=True)
         '''
         if np.any(idx := (np.logical_not(np.isfinite(data)))):
             if zero_padding:
@@ -488,7 +828,24 @@ class Cube(object):
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
+    ) -> np.ndarray:
+        '''Create a noise cube.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS noise of the cube.
+            shape (tuple[int, ...]): Shape of the cube.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Noise cube.
+
+        Examples:
+            >>> noise = cube.create_noise(rms, shape, func_convlution)
+        '''
         rng = default_rng(seed)
         noise = rng.standard_normal(size=shape)
         if convolve:
@@ -508,10 +865,27 @@ class DataCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
-        '''Return perturbed data cube.
+    ) -> np.ndarray:
+        '''Perturb the data cube with the same noise level and return it.
 
-        This function is mainly for Monte Carlo simulations.
+        This method is useful to perturb the data cube for the Monte Carlo
+        estiamtes of fitting errors.
+
+        Args:
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the output is the
+                perturbed ``imagepalne``. If True, the perturbed ``original``
+                Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Perturbed data cube.
+
+        Examples:
+            >>> cube_perturbed = datacube.perturbed(convolve=func_fullconvolve)
         '''
         rms = self.rms(is_originalsize=True)
         rms = rms[..., np.newaxis, np.newaxis]
@@ -524,7 +898,25 @@ class DataCube(Cube):
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> DataCube:
-        '''Constructer.
+        '''Constructer of ``DataCube``.
+
+        Args:
+            data_or_fname (Union[np.ndarray, str]): Data array or fits file name.
+            header (Optional[fits.Header], optional): Header of the fits file,
+                necessary if ``data_or_fname`` is a data array. Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            DataCube: Data cube.
+
+        Examples:
+            >>> datacube = DataCube.create('data.fits')
+
+        Note:
+            When the file name is give, the loaded data is squeezed; that is, the
+            axis with zero size is dropped. Specifically, the polarization axis of
+            the ALMA fits data may be dropped.
         '''
         if isinstance(data_or_fname, np.ndarray):
             return cls(data_or_fname, header)
@@ -540,7 +932,20 @@ class DataCube(Cube):
 
     @staticmethod
     def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
-        '''Read cube data from fits file.
+        '''Read a data cube from a fits file.
+
+        Args:
+            fname (str): Fits file name.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, fits.Header]: Tuple of the data and the fits header.
+
+        Note:
+            When the file name is give, the loaded data is squeezed; that is, the
+            axis with zero size is dropped. Specifically, the polarization axis of
+            the ALMA fits data may be dropped.
         '''
         with fits.open(fname) as hdul:
             # np.squeeze is needed to erase the polari axis.
@@ -551,6 +956,8 @@ class DataCube(Cube):
 
 class ModelCube(Cube):
     '''Cube class to contain a modeled datacube.
+
+    This class is especially for the best-fit model cube.
     '''
 
     def __init__(
@@ -572,7 +979,24 @@ class ModelCube(Cube):
         lensing: Optional[Callable] = None,
         convolve: Optional[Callable] = None,
     ) -> ModelCube:
-        '''Constructer.
+        '''Constructer of ``ModelCube``.
+
+        Args:
+            params (tuple[float, ...]): Input parameters.
+            datacube (DataCube): Data cube. The size of the model cube is based on
+                this data cube.
+            lensing (Optional[Callable], optional): Lensing function.
+                Defaults to None.
+            convolve (Optional[Callable], optional): Convolving function.
+                Defaults to None.
+
+        Returns:
+            ModelCube: Model cube.
+
+        Examples:
+            >>> model = ModelCube.create(params, tok.datacube,
+                                         lensing=tok.gravlens.lensing,
+                                         convolve=tok.dirtybeam.fullconvolve)
         '''
         # shape = datacube.original.shape
         # x, y, v = (np.arange(shape[2]), np.arange(shape[1]), np.arange(shape[0]))
@@ -606,8 +1030,29 @@ class ModelCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
-    ):
-        '''Return noisy mock data cube.
+    ) -> np.ndarray:
+        '''Convert to and output noisy mock cube.
+
+        Args:
+            rms (Union[float, np.ndarray]): RMS noise added to the model cube,
+                after convolution.
+            convolve (Optional[Callable], optional): Convolution function. This
+                convolve both *raw* model cube and noise. Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            is_originalsize (bool, optional): If False, the output mock cube is
+                the same size as ``imageplane``. If True, the size is the same
+                as ``original``. Defaults to False.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+
+        Returns:
+            np.ndarray: Mock data cube.
+
+        Examples:
+            >>> mock = modelcube.to_mockcube(
+                           tok.datacube.rms(),
+                           tok.dirtybeam.fullconvolve,
+                           is_original=True)
         '''
         if self.raw is None:
             raise ValueError('Raw model is None.')
@@ -639,7 +1084,17 @@ class DirtyBeam:
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> DirtyBeam:
-        '''Constructer
+        '''Constructer of ``DirtyBeam``.
+
+        Args:
+            data_or_fname (Union[np.ndarray, str]): Data array or fits file name.
+            header (Optional[fits.Header], optional): Header of the fits file.
+                Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            DirtyBeam: instance of ``DirtyBeam``.
         '''
         if isinstance(data_or_fname, np.ndarray):
             return cls(data_or_fname, header)
@@ -654,7 +1109,20 @@ class DirtyBeam:
         raise TypeError(message)
 
     def convolve(self, image: np.ndarray) -> np.ndarray:
-        '''Convolve image with dirtybeam (psf).
+        '''Convolve ``imageplane`` with dirtybeam (psf) in two dimension.
+
+        Perform two-dimensional convolution at each pixel (channel) along the
+        velocity axis.
+
+        Args:
+            image (np.ndarray): Image to be convolved. Note that the size must be
+                the same as the attribute ``imageplane``.
+
+        Returns:
+            np.ndarray: 2D-convolved cube.
+
+        Examples:
+            >>> convolved_image = dirtybeam.convole(image)
         '''
         # s1 = np.arange(c.conf.kernel_num)
         # t1 = np.arange(c.conf.kernel_num)
@@ -680,7 +1148,32 @@ class DirtyBeam:
         uvcoverage: Optional[np.ndarray] = None,
         is_noise: bool = False,
     ) -> np.ndarray:
-        '''Convolve image with original-size dirtybeam (psf).
+        '''Convolve ``original`` with dirtybeam (psf) in two dimension.
+
+        Difference between ``convolve()`` and ``fullconvolve()`` is the size of
+        the input ``image``. This method ``fullconvolve`` treat the image with the
+        same size as the ``dirtybeam.original``.
+
+        Args:
+            image (np.ndarray): Image to be convolved. Note that the size must be
+                the same as the attribute ``original``.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+            is_noise (bool, optional): True if ``image`` is data. False if noise.
+                Defaults to False.
+
+        Returns:
+            np.ndarray: 2D-convolved cube.
+
+        Examples:
+            >>> convolved_image = dirtybeam.fullconvole(tok.modelcube.raw)
+
+            How to create convolved noise.
+
+            >>> rng = numpy.random.default_rng()
+            >>> noise = rng.standard_normal(size=shape)
+            >>> noise = dirtybeam.fullconvolve(
+                            noise, uvcoverage=uvcoverage, is_noise=True)
         '''
         kernel = self.original
         dim = len(image.shape)
@@ -707,7 +1200,15 @@ class DirtyBeam:
         ylim: Union[tuple[int, int], slice],
         vlim: Union[tuple[int, int], slice],
     ) -> None:
-        '''Cutout a cubic region from the dirty beam map.
+        '''Cutout a cubic region from the dirty beam cube.
+
+        Args:
+            xlim (Union[tuple[int, int], slice]): The limit of the x-axis.
+            ylim (Union[tuple[int, int], slice]): The limit of the y-axis.
+            vlim (Union[tuple[int, int], slice]): The limit of the v-axis.
+
+        Returns:
+            None:
         '''
         xslice = slice(*xlim) if isinstance(xlim, tuple) else xlim
         yslice = slice(*ylim) if isinstance(ylim, tuple) else ylim
@@ -716,24 +1217,40 @@ class DirtyBeam:
         self.uvplane = misc.rfft2(self.original[vslice, :, :])
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
-        '''Cutout a cubic region from the dirty beam map.
+        '''Cutout a region with the same size of the input ``cube``.
+
+        Args:
+            cube (DataCube): Datacube. The size of ``cube.original`` must be the
+                same as the ``dirtybeam.original``. This method makes the size of
+                the ``dirtybeam.imageplane`` the same as ``cube.imageplane``.
+
+        Returns:
+            None:
         '''
         _, ysize, xsize = self.original.shape
         xlen = cube.xlim[1] - cube.xlim[0]
         ylen = cube.ylim[1] - cube.ylim[0]
-        xslice = self.get_slice_at_center(xsize, xlen)
-        yslice = self.get_slice_at_center(ysize, ylen)
+        xslice = self._get_slice_at_center(xsize, xlen)
+        yslice = self._get_slice_at_center(ysize, ylen)
         vslice = cube.vslice
         self.cutout(xslice, yslice, vslice)
 
     @staticmethod
     def loadfits(fname: str, index_hdul: int = 0) -> tuple[np.ndarray, fits.Header]:
-        '''Read dirtybeam from fits file.
+        '''Read the dirty beam from a fits file.
+
+        Args:
+            fname (str): Fits file name.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, fits.Header]: Tuple of the data and the fits header.
 
         CAUTION:
-        The data shape of dirtybeam must be the same as the datacube (cubeimage).
-        This requirement is naturaly satisfied if input dirtybeam and cubeimage fits
-        files are simulationsly created.
+            The data shape of ``DirtyBeam`` must be the same as the ``Datacube``.
+            This requirement is naturaly satisfied if the input dirty-beam and
+            the image-cube fits files are simulationsly created with CASA.
         '''
         with fits.open(fname) as hdul:
             beam = hdul[index_hdul].data
@@ -741,8 +1258,18 @@ class DirtyBeam:
         return np.squeeze(beam), header
 
     @staticmethod
-    def get_slice_at_center(len_original: int, len_sub: int) -> slice:
+    def _get_slice_at_center(len_original: int, len_sub: int) -> slice:
         '''Get a central slice of the original array.
+
+        This submethod aims to give a slice whose center is always identical to
+        the center of the cube (i.e, dirty beam).
+
+        Args:
+            len_original (int): Length of the data cube.
+            len_sub (int): Length of the cutout image.
+
+        Returns:
+            slice: Slice around the center.
         '''
         if len_original % 2 == 0:  # even
             margin_end = (len_original - len_sub) // 2
@@ -794,7 +1321,23 @@ class GravLens:
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> GravLens:
-        '''Constructer
+        '''Constructer of ``GravLens``.
+
+        Args:
+            data_or_fname_gamma1 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma1.
+            data_or_fname_gamma2 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma2.
+            data_or_fname_kappa (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, kappa.
+            header (Optional[fits.Header], optional): Header of the fits file.
+                This method assumes that lensing parameter maps, gamma1, gamma2,
+                and kappa, have the same size and coordinates. Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            GravLens: Instance of ``GravLens``.
         '''
         if not (
             isinstance(data_or_fname_gamma1, type(data_or_fname_gamma2))
@@ -837,14 +1380,27 @@ class GravLens:
     def lensing(self, coordinates: np.ndarray) -> np.ndarray:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
-        This method use gravitational lensing parameters: gamma1, gamma2, and kappa.
-        coordinates -- position array including (x, y).
-                       shape: (n, m, 2) and shape of x: (n, m)
+        Args:
+            coordinates (np.ndarray): Array of the x and y coordinates on the
+                image plane. The shape of the array is (n, m, 2), where (n, m) is
+                the shape of x (or y) and x and y have been already concatenated,
+                so "2" appears.
+
+        Returns:
+            np.ndarray: Coordinates on the source plane. The array shape is
+                (n, m, 2)
+
+        Examples:
+            >>> coord_image = np.moveaxis(np.array([xx, yy]), 0, -1)
+            >>> coord_source = lensing(coord_image)
         '''
         return np.squeeze(self.jacob @ coordinates[..., np.newaxis], -1)
 
     def get_jacob(self) -> np.ndarray:
-        '''Get jacobian
+        '''Get Jacobian of the lensing equation.
+
+        Returns:
+            np.ndarray: Jacobian
         '''
         g1 = self.gamma1
         g2 = self.gamma2
@@ -858,7 +1414,21 @@ class GravLens:
         return jacob
 
     def match_wcs_with(self, cube: DataCube) -> None:
-        '''Match the world coordinate system with input data.
+        '''Match the world coordinate system with the input data cube.
+
+        Use the wcs of ``cube.imageplane``; therefore, the matched lensing
+        parameter map become smaller than the original map.
+
+        Args:
+            cube (DataCube): ``DataCube`` including the header information. This
+                method uses the wcs included in the header of the data cube and
+                the ``GravLens`` instance.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> gravlens.match_wcs_with(datacube)
         '''
         assert self.header is not None
         wcs_cube = wcs.WCS(cube.header)
@@ -877,15 +1447,25 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self, z_lens: float, z_source: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
     ) -> None:
-        '''Correct lensing parameters with the redshifts.
+        '''Correct the lensing parameters using the redshifts.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            None:
         '''
         self.z_lens = z_lens
         self.z_source = z_source
         self.z_assumed = z_assumed
         self.distance_ratio = self.get_angular_distance_ratio(
-            z_lens, z_source, z_assumed
+            z_source, z_lens, z_assumed
         )
         self.gamma1 = self.gamma1_cutout * self.distance_ratio
         self.gamma2 = self.gamma2_cutout * self.distance_ratio
@@ -893,7 +1473,7 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def reset_redshifts(self) -> None:
-        '''Reset redshifts.
+        '''Reset the redshift infomation.
         '''
         self.z_lens = None
         self.z_source = None
@@ -905,16 +1485,37 @@ class GravLens:
         self.jacob = self.get_jacob()
 
     def magnification(self) -> np.ndarray:
-        '''Get magnification factor.
+        '''Get magnification factor using the lensing parameters.
+
+        Returns:
+            np.ndarray: Magnification map.
         '''
         gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
     def get_angular_distance_ratio(
-        z_lens: float, z_source: float, z_assumed: float = np.inf
+        z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> float:
-        '''Angular distance ratio between D_LS and D_S.
+        '''Angular distance ratio of D_LS to D_S, normalized by assumed D_LS/D_S.
+
+        Lensing parameter maps are distributed using some D_LS/D_S at specific
+        redshifts. This method provides a new factor that can be multiplied by
+        the lensing parameter maps to correct the redshift dependency.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            float: Angular distance ratio, D_LS/D_S
+
+        Examples:
+            >>> distance_ratio = gravlens.get_angular_distance_ratio(6.2, 0.9)
+            >>> gamma1_new = gamma1_old * distance_ratio
         '''
         D_S = c.cosmo.angular_diameter_distance(z_source)
         D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
@@ -931,6 +1532,17 @@ class GravLens:
         fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
+
+        Args:
+            fname_gamma1 (str): Fits file name of the gamma1 map.
+            fname_gamma2 (str): Fits file name of the gamma2 map.
+            fname_kappa (str): Fits file name of the kappa map.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Assumes that all the fits files include the lensing parameter maps
+                at the same extension index. Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]: [description]
         '''
         with fits.open(fname_gamma1) as hdul:
             gamma1 = hdul[index_hdul].data
