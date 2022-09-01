@@ -4,18 +4,18 @@
 
 * Preparing Data
 
-The test data are provided in this url.
+The test data are provided in this url: https://github.com/sugayu/tokult/tree/dev/tutorial.
 Download the data and put them on a directory to work in.
 You can download the data from the terminal with:
 #+begin_src bash
-  $ mkdir tokult_tutorial
-  $ cd tokult_tutorial
-  $ wget -nH --cut-dirs=5 -r --no-parent https://github.com/sugayu/tokult/tree/dev/data/
+  $ svn export https://github.com/sugayu/tokult/branches/dev/tutorial/
+  $ cd tutorial
 #+end_src
 
-Here lists the data.
-- cube_dirty.fits: ALMA mock dirty cube with /natural/ weighting.
+Here lists the donwloaded data.
+- mockcube_dirty.fits: ALMA mock dirty cube with /natural/ weighting.
 - cube_dirty.psf.fits: ALMA dirty beam with /natural/ weighting.
+- cube_dirty_tutorial_uniform.psf.fits: ALMA dirty beam with /uniform/ weighting.
 - gamma1.fits: map of lensing parameter \(\gamma_1\).
 - gamma2.fits: map of lensing parameter \(\gamma_2\).
 - kappa.fits: map of lensing parameter \(\kappa\).
