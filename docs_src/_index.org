@@ -15,8 +15,6 @@ Modules:
 - [[https://scipy.org][SciPy]]
 - [[https://www.astropy.org][Astropy]]
 - [[https://emcee.readthedocs.io/en/stable/][emcee]] 3.0.0 or later
-
-To show a progress bar requires:
 - [[https://tqdm.github.io][tqdm]]
 
 ** Installation

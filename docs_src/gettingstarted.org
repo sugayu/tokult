@@ -13,12 +13,12 @@ You can download the data from the terminal with:
 #+end_src
 
 Here lists the donwloaded data.
-- ~mockcube_dirty.fits~ :: The ALMA mock dirty cube with /natural/ weighting.
-- ~cube_dirty.psf.fits~ :: The ALMA dirty beam with /natural/ weighting.
+- ~mockcube_dirty_tutorial.fits~ :: The ALMA mock dirty cube with /natural/ weighting.
+- ~cube_dirty_tutorial.psf.fits~ :: The ALMA dirty beam with /natural/ weighting.
 - ~cube_dirty_tutorial_uniform.psf.fits~ :: The ALMA dirty beam with /uniform/ weighting.
-- ~gamma1.fits~ :: The map of lensing parameter \(\gamma_1\).
-- ~gamma2.fits~ :: The map of lensing parameter \(\gamma_2\).
-- ~kappa.fits~ :: The map of lensing parameter \(\kappa\).
+- ~gamma1_tutorial.fits~ :: The map of lensing parameter \(\gamma_1\).
+- ~gamma2_tutorial.fits~ :: The map of lensing parameter \(\gamma_2\).
+- ~kappa_tutorial.fits~ :: The map of lensing parameter \(\kappa\).
 
 # #+begin_src ipython :exports both :results raw drawer
 #   import os
@@ -181,10 +181,25 @@ Let's fit an example data; but it takes more than the least-square method, maybe
   )
 #+end_src
 
-#+RESULTS:
+#+RESULTS: uvfit-pbar
 :results:
 # Out[12]:
-100% 5000/5000 [18:57<00:00,  4.40it/s]
+100%|█████████████████████████████|5000/5000 [18:57<00:00,  4.40it/s]
 :end:
 
 If you want to use parallelization, please see [TBD].
+
+* Parallelization
+Short code as an example.
+#+begin_src ipython :exports code :async t :results raw drawer
+  import multiprocessing
+
+  with multiprocessing.Pool() as pool:
+      sol = tok.uvfit(
+          init=init,
+          bound=bound,
+          mask_for_fit=uvcoverage,
+          progressbar=True,
+          pool=pool
+      )
+#+end_src

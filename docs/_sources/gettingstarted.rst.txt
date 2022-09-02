@@ -18,17 +18,17 @@ the terminal with:
 
 Here lists the donwloaded data.
 
-``mockcube_dirty.fits``
+``mockcube_dirty_tutorial.fits``
    The ALMA mock dirty cube with *natural* weighting.
-``cube_dirty.psf.fits``
+``cube_dirty_tutorial.psf.fits``
    The ALMA dirty beam with *natural* weighting.
 ``cube_dirty_tutorial_uniform.psf.fits``
    The ALMA dirty beam with *uniform* weighting.
-``gamma1.fits``
+``gamma1_tutorial.fits``
    The map of lensing parameter :math:`\gamma_1`.
-``gamma2.fits``
+``gamma2_tutorial.fits``
    The map of lensing parameter :math:`\gamma_2`.
-``kappa.fits``
+``kappa_tutorial.fits``
    The map of lensing parameter :math:`\kappa`.
 
 Quickstart
@@ -202,4 +202,30 @@ method, maybe **>~10 minuts** for the tutorial data.
        init=init, bound=bound, mask_for_fit=uvcoverage, progressbar=True
    )
 
+.. raw:: org
+
+   #+results: uvfit-pbar
+
+.. container:: RESULTS drawer
+
+   100%|█████████████████████████████|5000/5000 [18:57<00:00, 4.40it/s]
+
 If you want to use parallelization, please see [TBD].
+
+Parallelization
+===============
+
+Short code as an example.
+
+.. code:: ipython
+
+   import multiprocessing
+
+   with multiprocessing.Pool() as pool:
+       sol = tok.uvfit(
+           init=init,
+           bound=bound,
+           mask_for_fit=uvcoverage,
+           progressbar=True,
+           pool=pool
+       )

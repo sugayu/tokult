@@ -50,6 +50,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#restarting-model-fit">Restarting model-fit</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#parallelization">Parallelization</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
@@ -99,17 +100,17 @@ $ <span class="nb">cd</span> tutorial
 </div>
 <p>Here lists the donwloaded data.</p>
 <dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">mockcube_dirty.fits</span></code></dt><dd><p>The ALMA mock dirty cube with <em>natural</em> weighting.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">mockcube_dirty_tutorial.fits</span></code></dt><dd><p>The ALMA mock dirty cube with <em>natural</em> weighting.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>natural</em> weighting.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty_tutorial.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>natural</em> weighting.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">cube_dirty_tutorial_uniform.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>uniform</em> weighting.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">gamma1.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_1\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">gamma1_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_1\)</span>.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">gamma2.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_2\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">gamma2_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_2\)</span>.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">kappa.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\kappa\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">kappa_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\kappa\)</span>.</p>
 </dd>
 </dl>
 </div>
@@ -243,7 +244,26 @@ method, maybe <strong>&gt;~10 minuts</strong> for the tutorial data.</p>
 <span class="p">)</span>
 </pre></div>
 </div>
+<div class="results drawer docutils container">
+<p>100%|█████████████████████████████|5000/5000 [18:57&lt;00:00, 4.40it/s]</p>
+</div>
 <p>If you want to use parallelization, please see [TBD].</p>
+</div>
+</div>
+<div class="section" id="parallelization">
+<h2>Parallelization<a class="headerlink" href="#parallelization" title="Permalink to this heading"></a></h2>
+<p>Short code as an example.</p>
+<div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">multiprocessing</span>
+
+<span class="k">with</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">()</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+    <span class="n">sol</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">uvfit</span><span class="p">(</span>
+        <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
+        <span class="n">bound</span><span class="o">=</span><span class="n">bound</span><span class="p">,</span>
+        <span class="n">mask_for_fit</span><span class="o">=</span><span class="n">uvcoverage</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">pool</span><span class="o">=</span><span class="n">pool</span>
+    <span class="p">)</span>
+</pre></div>
 </div>
 </div>
 </div>

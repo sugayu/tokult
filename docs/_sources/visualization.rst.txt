@@ -30,10 +30,6 @@ data cube. The best-fit model cube is stored in the ``tok`` as
 
 .. container:: RESULTS drawer
 
-   ::
-
-      <matplotlib.image.AxesImage at 0x7fcdecc20f70>
-
    .. image:: ./obipy-resources/fig_moment0.png
 
 Moment 1 map
@@ -61,10 +57,6 @@ moment-1 (velocity) map of the data cube.
    #+results: fig_moment1
 
 .. container:: RESULTS drawer
-
-   ::
-
-      <matplotlib.image.AxesImage at 0x7fcdebe592b0>
 
    .. image:: ./obipy-resources/fig_moment1.png
 
@@ -125,6 +117,8 @@ To save the animation in a file, ``matplotlib.animation`` is an option.
 .. container:: RESULTS drawer
 
    .. image:: ./obipy-resources/anime_cube.gif
+
+…why does this animation have so poor image quality?
 
 Convergence of MCMC sampler
 ===========================

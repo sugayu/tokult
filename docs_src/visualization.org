@@ -21,7 +21,7 @@ We can visually compare the data and model using ~tok.datacube~ and ~tok.modelcu
 #+RESULTS: fig_moment0
 :results:
 # Out[13]:
-: <matplotlib.image.AxesImage at 0x7fcdecc20f70>
+# : <matplotlib.image.AxesImage at 0x7fcdecc20f70>
 [[file:./obipy-resources/fig_moment0.png]]
 :end:
 
@@ -45,7 +45,7 @@ Similar to the moment-0 map, ~DataCube.pixmoment1()~ reutrns the moment-1 (veloc
 #+RESULTS: fig_moment1
 :results:
 # Out[17]:
-: <matplotlib.image.AxesImage at 0x7fcdebe592b0>
+# : <matplotlib.image.AxesImage at 0x7fcdebe592b0>
 [[file:./obipy-resources/fig_moment1.png]]
 :end:
 
@@ -98,6 +98,8 @@ To save the animation in a file, ~matplotlib.animation~ is an option.
 # Out[17]:
 [[file:./obipy-resources/anime_cube.gif]]
 :end:
+
+...why does this animation have so poor image quality?
 
 * Convergence of MCMC sampler
 The MCMC sampler during the MCMC fitting are stored in the solution, ~sol.sampler~.
