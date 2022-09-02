@@ -1,4 +1,25 @@
-* Installation
+* Tool of Kinematics on uv-plane for Lensed Targets
+Tokult is a tool to analyze the kinematics of galaxies.
+
+Tokult is created to fit the 3D data cubes, especially ALMA cube images, but applicable to other IFU data formats.
+
+** Requirements
+Required Python version:
+- [[https://www.python.org][Python]] 3.9 or later
+#+begin_warning
+This code does not work with Python <= 3.8 and Python 2.
+#+end_warning
+
+Modules:
+- [[https://numpy.org][NumPy]]
+- [[https://scipy.org][SciPy]]
+- [[https://www.astropy.org][Astropy]]
+- [[https://emcee.readthedocs.io/en/stable/][emcee]] 3.0.0 or later
+
+To show a progress bar requires:
+- [[https://tqdm.github.io][tqdm]]
+
+** Installation
 You can install Tokult from the github repository using ~pip~:
 #+begin_src bash
   $ pip install git+https://github.com/sugayu/tokult.git@dev

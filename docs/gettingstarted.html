@@ -89,7 +89,7 @@
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this heading"></a></h1>
 <div class="section" id="preparing-data">
 <h2>Preparing Data<a class="headerlink" href="#preparing-data" title="Permalink to this heading"></a></h2>
-<p>The test data are provided in this url:
+<p>The tutorial data are provided in this url:
 <a class="reference external" href="https://github.com/sugayu/tokult/tree/dev/tutorial">https://github.com/sugayu/tokult/tree/dev/tutorial</a>. Download the data
 and put them on a directory to work in. You can download the data from
 the terminal with:</p>
@@ -98,15 +98,20 @@ $ <span class="nb">cd</span> tutorial
 </pre></div>
 </div>
 <p>Here lists the donwloaded data.</p>
-<ul class="simple">
-<li><p>mockcube_dirty.fits: ALMA mock dirty cube with <em>natural</em> weighting.</p></li>
-<li><p>cube_dirty.psf.fits: ALMA dirty beam with <em>natural</em> weighting.</p></li>
-<li><p>cube_dirty_tutorial_uniform.psf.fits: ALMA dirty beam with <em>uniform</em>
-weighting.</p></li>
-<li><p>gamma1.fits: map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_1\)</span>.</p></li>
-<li><p>gamma2.fits: map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_2\)</span>.</p></li>
-<li><p>kappa.fits: map of lensing parameter <span class="math notranslate nohighlight">\(\kappa\)</span>.</p></li>
-</ul>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">mockcube_dirty.fits</span></code></dt><dd><p>The ALMA mock dirty cube with <em>natural</em> weighting.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>natural</em> weighting.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty_tutorial_uniform.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>uniform</em> weighting.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">gamma1.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_1\)</span>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">gamma2.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_2\)</span>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">kappa.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\kappa\)</span>.</p>
+</dd>
+</dl>
 </div>
 <div class="section" id="quickstart">
 <h2>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this heading"></a></h2>
@@ -134,9 +139,9 @@ parameters with the methods <code class="docutils literal notranslate"><span cla
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">xlim</span></code>, <code class="docutils literal notranslate"><span class="pre">ylim</span></code>, and <code class="docutils literal notranslate"><span class="pre">vlim</span></code> determine the size of an argument
-<code class="docutils literal notranslate"><span class="pre">imageplane</span></code> of <code class="docutils literal notranslate"><span class="pre">tok.datacube</span></code> and others. The redshift information
-is stored in internal parameters and also used to convert the parameters
-to those in physical units later.</p>
+<code class="docutils literal notranslate"><span class="pre">tok.datacube.imageplane</span></code> and others. The redshift information is
+stored in internal parameters and also used to convert the parameters to
+those in physical units later.</p>
 </div>
 <div class="section" id="uv-coverage">
 <h3><em>uv</em>-coverage<a class="headerlink" href="#uv-coverage" title="Permalink to this heading"></a></h3>
@@ -228,9 +233,9 @@ and the residual map looks like pure noises as the right panel.</p>
 <div class="section" id="restarting-model-fit">
 <h3>Restarting model-fit<a class="headerlink" href="#restarting-model-fit" title="Permalink to this heading"></a></h3>
 <p>It is known that the least-square method may underestimate the fitting
-uncertainties, especially for the spatially-correlated data. To obtain
-correct uncertainties, as well as to escape from the local minimum, the
-MCMC method on the <em>uv</em> plane is a great option.</p>
+uncertainties for the spatially-correlated data. To obtain correct
+uncertainties, as well as to escape from the local minimum, the MCMC
+method on the <em>uv</em> plane is a great option.</p>
 <p>Let’s fit an example data; but it takes more than the least-square
 method, maybe <strong>&gt;~10 minuts</strong> for the tutorial data.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">uvfit</span><span class="p">(</span>

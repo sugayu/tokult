@@ -2,7 +2,7 @@
 #+options: author:nil date:nil
 #+options: ^:{}
 
-This visualization tutorial uses an instance ~tok~ and ~sol~ obtained by fitting the tutorial data according to :doc:[[file:gettingstarted]].
+This visualization tutorial uses an instance ~tok~ and ~sol~ obtained by fitting the tutorial data according to :doc:`gettingstarted`.
 
 * Moment 0 map
 ~Cube.moment0()~ reutrns the moment-0 (integrated-flux) map of the data cube.

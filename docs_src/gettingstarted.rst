@@ -6,7 +6,7 @@ Getting Started
 Preparing Data
 ==============
 
-The test data are provided in this url:
+The tutorial data are provided in this url:
 https://github.com/sugayu/tokult/tree/dev/tutorial. Download the data
 and put them on a directory to work in. You can download the data from
 the terminal with:
@@ -18,13 +18,18 @@ the terminal with:
 
 Here lists the donwloaded data.
 
--  mockcube_dirty.fits: ALMA mock dirty cube with *natural* weighting.
--  cube_dirty.psf.fits: ALMA dirty beam with *natural* weighting.
--  cube_dirty_tutorial_uniform.psf.fits: ALMA dirty beam with *uniform*
-   weighting.
--  gamma1.fits: map of lensing parameter :math:`\gamma_1`.
--  gamma2.fits: map of lensing parameter :math:`\gamma_2`.
--  kappa.fits: map of lensing parameter :math:`\kappa`.
+``mockcube_dirty.fits``
+   The ALMA mock dirty cube with *natural* weighting.
+``cube_dirty.psf.fits``
+   The ALMA dirty beam with *natural* weighting.
+``cube_dirty_tutorial_uniform.psf.fits``
+   The ALMA dirty beam with *uniform* weighting.
+``gamma1.fits``
+   The map of lensing parameter :math:`\gamma_1`.
+``gamma2.fits``
+   The map of lensing parameter :math:`\gamma_2`.
+``kappa.fits``
+   The map of lensing parameter :math:`\kappa`.
 
 Quickstart
 ==========
@@ -59,9 +64,9 @@ parameters with the methods ``use_region()`` and ``use_redshifts()``.
    # tok.use_redshifts(z_lens=0.541, z_source=1000)  # not used in this tutorial.
 
 The ``xlim``, ``ylim``, and ``vlim`` determine the size of an argument
-``imageplane`` of ``tok.datacube`` and others. The redshift information
-is stored in internal parameters and also used to convert the parameters
-to those in physical units later.
+``tok.datacube.imageplane`` and others. The redshift information is
+stored in internal parameters and also used to convert the parameters to
+those in physical units later.
 
 *uv*-coverage
 -------------
@@ -184,9 +189,9 @@ Restarting model-fit
 --------------------
 
 It is known that the least-square method may underestimate the fitting
-uncertainties, especially for the spatially-correlated data. To obtain
-correct uncertainties, as well as to escape from the local minimum, the
-MCMC method on the *uv* plane is a great option.
+uncertainties for the spatially-correlated data. To obtain correct
+uncertainties, as well as to escape from the local minimum, the MCMC
+method on the *uv* plane is a great option.
 
 Let's fit an example data; but it takes more than the least-square
 method, maybe **>~10 minuts** for the tutorial data.

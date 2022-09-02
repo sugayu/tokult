@@ -21,4 +21,4 @@ We will remove ~@dev~ when the code is open to public.
 #+end_note
 
 * Documents
-See [[https:sugayu.github.io/tokult/]].
+See [[https://sugayu.github.io/tokult/]].
