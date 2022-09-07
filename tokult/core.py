@@ -3,10 +3,11 @@
 from __future__ import annotations
 import numpy as np
 from numpy.random import default_rng
+from scipy.interpolate import RectBivariateSpline
 from astropy.io import fits
 from astropy import wcs
 from multiprocessing.pool import Pool
-from typing import Callable, Sequence, Optional, Union
+from typing import Callable, Sequence, Optional, Union, Any
 from . import common as c
 from . import fitting
 from . import misc
@@ -52,44 +53,45 @@ class Tokult:
         gravlens: Union[tuple[np.ndarray, ...], tuple[str, ...], None] = None,
         header_data: Optional[fits.Header] = None,
         header_beam: Optional[fits.Header] = None,
-        header_gamma: Optional[fits.Header] = None,
+        header_gravlens: Optional[fits.Header] = None,
         index_data: int = 0,
         index_beam: int = 0,
-        index_gamma: int = 0,
+        index_gravlens: int = 0,
     ) -> Tokult:
         '''Constructer of ``Tokult``.
 
         Construct an instance easier than to use the init constructer.
 
         Args:
-            data (Union[np.ndarray, str]): Observed data. The format is a data array or
-                a fits file name.
-            beam (Union[np.ndarray, str, None], optional): Dirty beam or point spread
-                function (PSF). The format is a data array or a fits file name.
-                Defaults to None.
+            data (Union[np.ndarray, str]): Observed data. The format is a data
+                array or a fits file name.
+            beam (Union[np.ndarray, str, None], optional): Dirty beam or point
+                spread function (PSF). The format is a data array or a fits file
+                name. Defaults to None.
             gravlens (Union[tuple[np.ndarray, ...], tuple[str, ...]], None, optional):
                 Gravitational lensing parameters. The format is a tuple containing
-                the three data array or fits file names of parameters: gamma1, gamma2,
-                and kappa. Defaults to None.
+                the three data array or fits file names of parameters:
+                x_arcsec_deflect and y_arcsec_deflect. Defaults to None.
             header_data (Optional[fits.Header], optional): Header of data.
                 Defaults to None.
                 This is necessary when the ``data`` is not given in a fits file.
             header_beam (Optional[fits.Header], optional): Header of psf.
                 Defaults to None.
                 This is necessary when ``beam`` is not given in a fits file.
-            header_gamma (Optional[fits.Header], optional): Header of gamma.
+            header_gravlens (Optional[fits.Header], optional): Header of gravlens.
                 Defaults to None.
                 This is necessary when ``gravlens`` is not given in fits files.
-            index_data (int, optional): Index of fits extensions of the data fits file.
-                Defaults to 0.
-            index_beam (int, optional): Index of fits extensions of the beam fits file.
-                Defaults to 0.
-            index_gamma (int, optional): Index of fits extensions of the lens fits
-                files. Defaults to 0.
+            index_data (int, optional): Index of fits extensions of the data fits
+                file. Defaults to 0.
+            index_beam (int, optional): Index of fits extensions of the beam fits
+                file. Defaults to 0.
+            index_gravlens (int, optional): Index of fits extensions of the lens
+                fits files. Defaults to 0.
 
         Examples:
-            >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
-                                           ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
+            >>> tok = tokult.Tokult.launch(
+                         'data.fits', 'psf.fits',
+                         (x_arcsec_deflect.fits', y_arcsec_deflect.fits'))
         '''
         datacube = DataCube.create(data, header=header_data, index_hdul=index_data)
 
@@ -103,8 +105,11 @@ class Tokult:
 
         gl: Optional[GravLens]
         if gravlens is not None:
-            g1, g2, k = gravlens
-            gl = GravLens.create(g1, g2, k, header=header_gamma, index_hdul=index_gamma)
+            gl = GravLens.create(
+                data_or_fname_xy_arcsec_deflect=gravlens,
+                header=header_gravlens,
+                index_hdul=index_gravlens,
+            )
             gl.match_wcs_with(datacube)
         else:
             gl = None
@@ -440,7 +445,14 @@ class Tokult:
 
     def change_gravlens(
         self,
-        data_or_fname: Union[tuple[np.ndarray, ...], tuple[str, ...]],
+        *,
+        data_or_fname_xy_arcsec_deflect: Optional[
+            Union[tuple[np.ndarray, ...], tuple[str, ...]]
+        ] = None,
+        data_or_fname_xy_pixel_deflect: Optional[
+            Union[tuple[np.ndarray, ...], tuple[str, ...]]
+        ] = None,
+        data_or_fname_psi_arcsec: Optional[Union[np.ndarray, str]] = None,
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
     ) -> None:
@@ -448,8 +460,13 @@ class Tokult:
 
         May be useful to change ``gravlens`` of an instance.
         '''
-        g1, g2, k = data_or_fname
-        self.gravlens = GravLens.create(g1, g2, k, header=header, index_hdul=index_hdul)
+        self.gravlens = GravLens.create(
+            data_or_fname_xy_arcsec_deflect=data_or_fname_xy_arcsec_deflect,
+            data_or_fname_xy_pixel_deflect=data_or_fname_xy_pixel_deflect,
+            data_or_fname_psi_arcsec=data_or_fname_psi_arcsec,
+            header=header,
+            index_hdul=index_hdul,
+        )
 
     def construct_modelcube(self, params: tuple[float, ...]) -> None:
         '''Construct ``modelcube`` from the input parameters.
@@ -1280,9 +1297,393 @@ class DirtyBeam:
 
 
 class GravLens:
+    '''Deal with gravitational lensing effects based on a given lensed models.
+
+    Contents are lensing parameters depending on positions.
+    '''
+
+    def __init__(
+        self,
+        x_arcsec_deflect: np.ndarray,
+        y_arcsec_deflect: np.ndarray,
+        header: fits.Header,
+        z_source: Optional[float] = None,
+        z_lens: Optional[float] = None,
+        z_assumed: Optional[float] = None,
+    ) -> None:
+        self.original_x_arcsec_deflect = x_arcsec_deflect
+        self.original_y_arcsec_deflect = y_arcsec_deflect
+        self.idx_wcs = np.isfinite(x_arcsec_deflect)
+        self.shape = x_arcsec_deflect.shape
+
+        self.x_arcsec_deflect: np.ndarray
+        self.y_arcsec_deflect: np.ndarray
+        self.x_pixel_deflect: np.ndarray
+        self.y_pixel_deflect: np.ndarray
+        self.deflect: np.ndarray
+        self.header = header
+
+        self.z_source = z_source
+        self.z_lens = z_lens
+        self.z_assumed = z_assumed
+        if z_source is None:
+            self.distance_ratio = 1.0
+            self.compute_deflection_angles()
+        else:
+            assert z_lens is not None
+            assert z_assumed is not None
+            self.use_redshifts(z_source, z_lens, z_assumed)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        data_or_fname_xy_arcsec_deflect: Optional[
+            Union[tuple[np.ndarray, ...], tuple[str, ...]]
+        ] = None,
+        data_or_fname_xy_pixel_deflect: Optional[
+            Union[tuple[np.ndarray, ...], tuple[str, ...]]
+        ] = None,
+        data_or_fname_psi_arcsec: Optional[Union[np.ndarray, str]] = None,
+        header: Optional[fits.Header] = None,
+        index_hdul: int = 0,
+        z_source: Optional[float] = None,
+        z_lens: Optional[float] = None,
+        z_assumed: Optional[float] = None,
+    ) -> GravLens:
+        '''Constructer of ``GravLens``.
+
+        Args:
+            data_or_fname_gamma1 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma1.
+            data_or_fname_gamma2 (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, gamma2.
+            data_or_fname_kappa (Union[np.ndarray, str]): Data array or fits file
+                name of a lensing parmeter, kappa.
+            header (Optional[fits.Header], optional): Header of the fits file.
+                This method assumes that lensing parameter maps, gamma1, gamma2,
+                and kappa, have the same size and coordinates. Defaults to None.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Defaults to 0.
+
+        Returns:
+            GravLens: Instance of ``GravLens``.
+        '''
+        data_or_fname: Any
+        redshifts = (z_source, z_lens, z_assumed)
+
+        if (data_or_fname := data_or_fname_xy_arcsec_deflect) is not None:
+            data_or_fname_x, data_or_fname_y = data_or_fname
+            if isinstance((x_arcsec := data_or_fname_x), np.ndarray):
+                assert isinstance((y_arcsec := data_or_fname_y), np.ndarray)
+                return cls(x_arcsec, y_arcsec, header, *redshifts)
+            elif isinstance((fname_x := data_or_fname_x), str):
+                assert isinstance((fname_y := data_or_fname_y), str)
+                loaded = cls.loadfits(fname_x, fname_y, index_hdul=index_hdul)
+                return cls(*loaded, *redshifts)
+
+        elif (data_or_fname := data_or_fname_xy_pixel_deflect) is not None:
+            data_or_fname_x, data_or_fname_y = data_or_fname
+            if isinstance((x_pixel := data_or_fname_x), np.ndarray):
+                assert isinstance((y_pixel := data_or_fname_y), np.ndarray)
+                x_arcsec, y_arcsec = cls.convert_xy_pixel_to_arcsec(
+                    x_pixel, y_pixel, header=header
+                )
+                return cls(x_arcsec, y_arcsec, header, *redshifts)
+            elif isinstance((fname_x := data_or_fname_x), str):
+                assert isinstance((fname_y := data_or_fname_y), str)
+                loaded = cls.loadfits(fname_x, fname_y, index_hdul=index_hdul)
+                x_arcsec, y_arcsec = cls.convert_xy_pixel_to_arcsec(*loaded)
+                return cls(x_arcsec, y_arcsec, header, *redshifts)
+
+        elif (data_or_fname := data_or_fname_psi_arcsec) is not None:
+            if isinstance(data := data_or_fname, np.ndarray):
+                y_arcsec, x_arcsec = cls.gradient(data, header=header)
+                return cls(x_arcsec, y_arcsec, header, *redshifts)
+            elif isinstance((fname := data_or_fname), str):
+                with fits.open(fname) as hdul:
+                    psi = hdul[index_hdul].data
+                    header = hdul[index_hdul].header
+                y_arcsec, x_arcsec = cls.gradient(psi, header=header)
+                return cls(x_arcsec, y_arcsec, header, *redshifts)
+
+        message = (
+            'Either "data_or_fname_xy_arcsec_deflect",'
+            '"data_or_fname_xy_pixel_deflect", or'
+            '"data_or_fname_psi_arcsec" must be input.'
+        )
+        c.logger.error(message)
+        raise TypeError(message)
+
+    def lensing(self, coordinates: np.ndarray) -> np.ndarray:
+        '''Convert coordinates (x, y) from the image plane to the source plane.
+
+        Args:
+            coordinates (np.ndarray): Array of the x and y coordinates on the
+                image plane. The shape of the array is (n, m, 2), where (n, m) is
+                the shape of x (or y) and x and y have been already concatenated,
+                so "2" appears.
+
+        Returns:
+            np.ndarray: Coordinates on the source plane. The array shape is
+                (n, m, 2)
+
+        Examples:
+            >>> coord_image = np.moveaxis(np.array([xx, yy]), 0, -1)
+            >>> coord_source = lensing(coord_image)
+        '''
+        return coordinates - self.deflect
+
+    def create_interpolate_lensing(
+        self, xgrid: np.ndarray, ygrid: np.ndarray
+    ) -> LensingInterpolate:
+        '''Retrun a LensingInterpolate instance.
+
+        Args:
+            xgrid (np.ndarray):
+            ygrid (np.ndarray):
+
+        Returns:
+            LensingInterpolate: [description]
+
+        Examples:
+            >>>
+        '''
+        xx = np.sort(np.unique(xgrid))
+        yy = np.sort(np.unique(ygrid))
+        return self.LensingInterpolate(
+            xx, yy, self.x_pixel_deflect, self.y_pixel_deflect
+        )
+
+    class LensingInterpolate:
+        def __init__(
+            self, xx: np.ndarray, yy: np.ndarray, z0: np.ndarray, z1: np.ndarray
+        ) -> None:
+            self.f0 = RectBivariateSpline(yy, xx, z0)
+            self.f1 = RectBivariateSpline(yy, xx, z1)
+
+        def __call__(self, y: np.ndarray, x: np.ndarray) -> np.ndarray:
+            return np.squeeze(np.array([x - self.f0(y, x), y - self.f1(y, x)]))
+
+    def match_wcs_with(self, cube: DataCube) -> None:
+        '''Match the world coordinate system with the input data cube.
+
+        Use the wcs of ``cube.imageplane``; therefore, the matched lensing
+        parameter map become smaller than the original map.
+
+        Args:
+            cube (DataCube): ``DataCube`` including the header information. This
+                method uses the wcs included in the header of the data cube and
+                the ``GravLens`` instance.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> gravlens.match_wcs_with(datacube)
+        '''
+        wcs_cube = wcs.WCS(cube.header)
+        wcs_gl = wcs.WCS(self.header)
+        skycoord_wcs, _, _ = wcs_cube.pixel_to_world(
+            cube.xgrid[0, :, :].ravel(), cube.ygrid[0, :, :].ravel(), 0, 0
+        )
+        self.idx = wcs_gl.world_to_array_index(skycoord_wcs)
+        self.shape = cube.xgrid.shape[1:]
+        self.compute_deflection_angles()
+
+    def use_redshifts(
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+    ) -> None:
+        '''Correct the lensing parameters using the redshifts.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            None:
+        '''
+        self.z_source = z_source
+        self.z_lens = z_lens
+        self.z_assumed = z_assumed
+        self.distance_ratio = self.get_angular_distance_ratio(
+            z_source, z_lens, z_assumed
+        )
+        self.compute_deflection_angles()
+
+    def reset_redshifts(self) -> None:
+        '''Reset the redshift infomation.
+        '''
+        self.z_lens = None
+        self.z_source = None
+        self.z_assumed = None
+        self.distance_ratio = 1.0
+        self.compute_deflection_angles()
+
+    def compute_deflection_angles(self):
+        '''Compute deflection angles in arcsec and pixels using redshifts
+        '''
+        x_arcsec_raw = self.original_x_arcsec_deflect[self.idx].reshape(*self.shape)
+        y_arcsec_raw = self.original_y_arcsec_deflect[self.idx].reshape(*self.shape)
+        self.x_arcsec_deflect = x_arcsec_raw * self.distance_ratio
+        self.y_arcsec_deflect = y_arcsec_raw * self.distance_ratio
+        self.x_pixel_deflect, self.y_pixel_deflect = self.convert_xy_arcsec_to_pixel(
+            self.x_arcsec_deflect, self.y_arcsec_deflect, header=self.header
+        )
+        self.deflect = np.moveaxis(
+            np.array([self.x_pixel_deflect, self.y_pixel_deflect]), 0, -1
+        )
+
+    @staticmethod
+    def convert_xy_arcsec_to_pixel(
+        x_arcsec: np.ndarray, y_arcsec: np.ndarray, header: fits.Header
+    ) -> tuple[np.ndarray, np.ndarray]:
+        '''Convert deflection angles of x and y in arcsec to in pixels.
+
+        Use the internal header "CDELT" for the conversion.
+
+        Args:
+            x_arcsec (np.ndarray): Deflection angle of x given in arcsec.
+            y_arcsec (np.ndarray): Deflection angle of y given in arcsec.
+            header (fits.Header): Header including units information
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Tuple of the deflection angles of x
+                and y in pixels.
+
+        Examples:
+            >>> x_pix, y_pix = gl.convert_xy_arcsec_to_pixel(x_arcsec, y_arcsec)
+
+        Nonte:
+            Assumes that the units of "CDELT1" and "CDELT2" are degree.
+        '''
+        dx_arcsec = abs(header['CDELT1'] * 3600)
+        dy_arcsec = abs(header['CDELT2'] * 3600)
+        return (x_arcsec / dx_arcsec, y_arcsec / dy_arcsec)
+
+    @staticmethod
+    def convert_xy_pixel_to_arcsec(
+        x_pixel: np.ndarray, y_pixel: np.ndarray, header: fits.Header
+    ) -> tuple[np.ndarray, np.ndarray]:
+        '''Convert deflection angles of x and y in pixel to in arcsec.
+
+        Use the internal header "CDELT" for the conversion.
+
+        Args:
+            x_pixel (np.ndarray): Deflection angle of x given in pixel.
+            y_pixel (np.ndarray): Deflection angle of y given in pixel.
+            header (fits.Header): Header including units information.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Tuple of the deflection angles of x
+                and y in arcsec.
+
+        Examples:
+            >>> x_arcsec, y_arcsec = gl.convert_xy_pixel_to_arcsec(x_pix, y_pix)
+
+        Nonte:
+            Assumes that the units of "CDELT1" and "CDELT2" are degree.
+        '''
+        dx_arcsec = abs(header['CDELT1'] * 3600)
+        dy_arcsec = abs(header['CDELT2'] * 3600)
+        return (x_pixel * dx_arcsec, y_pixel * dy_arcsec)
+
+    @staticmethod
+    def gradient(psi: np.ndarray, header: fits.Header) -> tuple[np.ndarray, np.ndarray]:
+        '''Compute gradient of 2D image.
+
+        This method is used to compute deflection angles from the deflection
+        potential psi.
+
+        Args:
+            psi (np.ndarray): 2D image of the deflection potential. The units are
+                given in arcsec, meaning that differentiation of psi with respect
+                to the angle in arcsec gives the deflection angles in arcsec.
+            header (fits.Header): Header including units information.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Tuple of the deflection angles of y
+                and x. Note that the order is (y, x).
+
+        Examples:
+            >>> y_arcsec, x_arcsec = gl.gradient(psi, header=header)
+
+        Nonte:
+            Assumes that the units of "CDELT1" and "CDELT2" are degree.
+        '''
+        dx_arcsec = abs(header['CDELT1'] * 3600)
+        dy_arcsec = abs(header['CDELT2'] * 3600)
+        return np.gradient(psi, dy_arcsec, dx_arcsec)
+
+    @staticmethod
+    def get_angular_distance_ratio(
+        z_source: float, z_lens: float, z_assumed: float = np.inf
+    ) -> float:
+        '''Angular distance ratio of D_LS to D_S, normalized by assumed D_LS/D_S.
+
+        Lensing parameter maps are distributed using some D_LS/D_S at specific
+        redshifts. This method provides a new factor that can be multiplied by
+        the lensing parameter maps to correct the redshift dependency.
+
+        Args:
+            z_source (float): The source (galaxy) redshift.
+            z_lens (float): The lens (cluster) redshift.
+            z_assumed (float, optional): The redshift assumed in the
+                gravitational parameters. If D_s / D_L = 1, the value
+                should be infinite (``np.inf``). Defaults to ``np.inf``.
+
+        Returns:
+            float: Angular distance ratio, D_LS/D_S
+
+        Examples:
+            >>> distance_ratio = gravlens.get_angular_distance_ratio(6.2, 0.9)
+            >>> gamma1_new = gamma1_old * distance_ratio
+        '''
+        D_S = c.cosmo.angular_diameter_distance(z_source)
+        D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
+        if np.isinf(z_assumed):
+            return (D_LS / D_S).decompose().value
+        D_ratio = D_LS / D_S
+        D_S_assumed = c.cosmo.angular_diameter_distance(z_assumed)
+        D_LS_assumed = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_assumed)
+        D_ratio_assumed = D_LS_assumed / D_S_assumed
+        return (D_ratio / D_ratio_assumed).decompose().value
+
+    @staticmethod
+    def loadfits(
+        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0,
+    ) -> tuple[np.ndarray, np.ndarray, fits.Header]:
+        '''Read gravlens from fits file.
+
+        Args:
+            fname_x_deflect (str): Fits file name of the deflect map of x.
+            fname_y_deflect (str): Fits file name of the deflect map of y.
+            index_hdul (int, optional): Index of fits extensions of the fits file.
+                Assumes that all the fits files include the lensing parameter maps
+                at the same extension index. Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, fits.Header]: Tuple of three objects;
+                deflection angles (x and y) and header.
+        '''
+        with fits.open(fname_x_deflect) as hdul:
+            x_deflect = hdul[index_hdul].data
+            header = hdul[index_hdul].header
+        with fits.open(fname_y_deflect) as hdul:
+            y_deflect = hdul[index_hdul].data
+        return x_deflect, y_deflect, header
+
+
+class GravLensOld:
     '''Contains gravitational lensing used for Cube.
 
     Contents are lensing parameters depending on positions: gamma1, gamma2, and kappa.
+
+    Warnig:
+        This class is outdated. No longer used.
     '''
 
     def __init__(
@@ -1320,7 +1721,7 @@ class GravLens:
         data_or_fname_kappa: Union[np.ndarray, str],
         header: Optional[fits.Header] = None,
         index_hdul: int = 0,
-    ) -> GravLens:
+    ) -> GravLensOld:
         '''Constructer of ``GravLens``.
 
         Args:
