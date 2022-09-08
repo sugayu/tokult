@@ -169,6 +169,9 @@ class Tokult:
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
+        func_create_lensinginterp = (
+            self.gravlens.create_interpolate_lensing if self.gravlens else None
+        )
 
         if optimization == 'mcmc':
             solution = fitting.mcmc(
@@ -177,6 +180,7 @@ class Tokult:
                 bound,
                 func_convolve=func_convolve,
                 func_lensing=func_lensing,
+                func_create_lensinginterp=func_create_lensinginterp,
                 mode_fit='image',
                 fix=fix,
                 is_separate=is_separate,
@@ -193,6 +197,7 @@ class Tokult:
                 bound,
                 func_convolve=func_convolve,
                 func_lensing=func_lensing,
+                func_create_lensinginterp=func_create_lensinginterp,
                 niter=niter,
                 mode_fit='image',
                 fix=fix,
@@ -208,6 +213,7 @@ class Tokult:
                 func_convolve=func_convolve,
                 func_fullconvolve=func_fullconvolve,
                 func_lensing=func_lensing,
+                func_create_lensinginterp=func_create_lensinginterp,
                 niter=niter,
                 nperturb=nperturb,
                 fix=fix,
@@ -288,6 +294,9 @@ class Tokult:
             c.logger.warning(msg)
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
+        func_create_lensinginterp = (
+            self.gravlens.create_interpolate_lensing if self.gravlens else None
+        )
 
         if optimization == 'mcmc':
             solution = fitting.mcmc(
@@ -297,6 +306,7 @@ class Tokult:
                 beam_vis=beam_visibility,
                 norm_weight=norm_weight,
                 func_lensing=func_lensing,
+                func_create_lensinginterp=func_create_lensinginterp,
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
@@ -314,6 +324,7 @@ class Tokult:
                 beam_vis=beam_visibility,
                 norm_weight=norm_weight,
                 func_lensing=func_lensing,
+                func_create_lensinginterp=func_create_lensinginterp,
                 mode_fit='uv',
                 fix=fix,
                 is_separate=is_separate,
@@ -494,11 +505,18 @@ class Tokult:
         datacube = self.datacube
         func_lensing = self.gravlens.lensing if self.gravlens else None
         func_convolve = self.dirtybeam.fullconvolve if self.dirtybeam else None
+        func_create_lensinginterp = (
+            self.gravlens.create_interpolate_lensing if self.gravlens else None
+        )
         # fitting.initialize_globalparameters_for_image(
         #     datacube, func_convolve, func_lensing
         # )
         self.modelcube = ModelCube.create(
-            params, datacube=datacube, convolve=func_convolve, lensing=func_lensing
+            params,
+            datacube=datacube,
+            convolve=func_convolve,
+            lensing=func_lensing,
+            create_interpolate_lensing=func_create_lensinginterp,
         )
 
     def calculate_normweight(self) -> float:
@@ -995,6 +1013,7 @@ class ModelCube(Cube):
         datacube: DataCube,
         lensing: Optional[Callable] = None,
         convolve: Optional[Callable] = None,
+        create_interpolate_lensing: Optional[Callable] = None,
     ) -> ModelCube:
         '''Constructer of ``ModelCube``.
 
@@ -1020,10 +1039,11 @@ class ModelCube(Cube):
         # vv_grid, yy_grid, xx_grid = np.meshgrid(v, y, x)
         imagecube = fitting.construct_model_at_imageplane_with(
             params,
-            xx_grid=datacube.xgrid,
-            yy_grid=datacube.ygrid,
-            vv_grid=datacube.vgrid,
+            xx_grid_image=datacube.xgrid,
+            yy_grid_image=datacube.ygrid,
+            vv_grid_image=datacube.vgrid,
             lensing=lensing,
+            create_interpolate_lensing=create_interpolate_lensing,
         )
         modelcube = np.zeros_like(datacube.original)
         xs, ys, vs = datacube.xslice, datacube.yslice, datacube.vslice
@@ -1313,15 +1333,26 @@ class GravLens:
     ) -> None:
         self.original_x_arcsec_deflect = x_arcsec_deflect
         self.original_y_arcsec_deflect = y_arcsec_deflect
-        self.idx_wcs = np.isfinite(x_arcsec_deflect)
-        self.shape = x_arcsec_deflect.shape
+        # self.idx_wcs = np.isfinite(x_arcsec_deflect)
+        # self.shape = x_arcsec_deflect.shape
+        self.original_xaxis = np.arange(x_arcsec_deflect.shape[1])
+        self.original_yaxis = np.arange(x_arcsec_deflect.shape[0])
+        self.xaxis = np.arange(x_arcsec_deflect.shape[1])
+        self.yaxis = np.arange(x_arcsec_deflect.shape[0])
 
         self.x_arcsec_deflect: np.ndarray
         self.y_arcsec_deflect: np.ndarray
         self.x_pixel_deflect: np.ndarray
         self.y_pixel_deflect: np.ndarray
-        self.deflect: np.ndarray
         self.header = header
+        self.header_datacube: Optional[fits.Header] = None
+
+        self.interpolate_x_arcsec = RectBivariateSpline(
+            self.original_yaxis, self.original_xaxis, x_arcsec_deflect
+        )
+        self.interpolate_y_arcsec = RectBivariateSpline(
+            self.original_yaxis, self.original_xaxis, y_arcsec_deflect
+        )
 
         self.z_source = z_source
         self.z_lens = z_lens
@@ -1415,24 +1446,20 @@ class GravLens:
         c.logger.error(message)
         raise TypeError(message)
 
-    def lensing(self, coordinates: np.ndarray) -> np.ndarray:
+    def lensing(self, xgrid: np.ndarray, ygrid: np.ndarray) -> tuple[np.ndarray, ...]:
         '''Convert coordinates (x, y) from the image plane to the source plane.
 
         Args:
-            coordinates (np.ndarray): Array of the x and y coordinates on the
-                image plane. The shape of the array is (n, m, 2), where (n, m) is
-                the shape of x (or y) and x and y have been already concatenated,
-                so "2" appears.
+            xgrid (np.ndarray): Array of the x coordinates on the image plane.
+            ygrid (np.ndarray): Array of the y coordinates on the image plane.
 
         Returns:
-            np.ndarray: Coordinates on the source plane. The array shape is
-                (n, m, 2)
+            tuple[np.ndarray, ...]: Tuple of coordinates on the source plane.
 
         Examples:
-            >>> coord_image = np.moveaxis(np.array([xx, yy]), 0, -1)
-            >>> coord_source = lensing(coord_image)
+            >>> xx_source, yy_source = lensing(xx_image, yy_image)
         '''
-        return coordinates - self.deflect
+        return (xgrid - self.x_pixel_deflect, ygrid - self.y_pixel_deflect)
 
     def create_interpolate_lensing(
         self, xgrid: np.ndarray, ygrid: np.ndarray
@@ -1440,14 +1467,15 @@ class GravLens:
         '''Retrun a LensingInterpolate instance.
 
         Args:
-            xgrid (np.ndarray):
-            ygrid (np.ndarray):
+            xgrid (np.ndarray): 2D array of the x coordinate.
+            ygrid (np.ndarray): 2D array of the y coordinate.
 
         Returns:
             LensingInterpolate: [description]
 
         Examples:
-            >>>
+            >>> lensing_interp = gl.create_interpolate_lensing(xgrid, ygrid)
+            >>> x0_s, y0_s = lensing_interp(x0_i, y0_i)
         '''
         xx = np.sort(np.unique(xgrid))
         yy = np.sort(np.unique(ygrid))
@@ -1487,8 +1515,14 @@ class GravLens:
         skycoord_wcs, _, _ = wcs_cube.pixel_to_world(
             cube.xgrid[0, :, :].ravel(), cube.ygrid[0, :, :].ravel(), 0, 0
         )
-        self.idx = wcs_gl.world_to_array_index(skycoord_wcs)
-        self.shape = cube.xgrid.shape[1:]
+        # self.idx_wcs = wcs_gl.world_to_array_index(skycoord_wcs)
+        xpixels, ypixels = wcs_gl.world_to_pixel(skycoord_wcs)
+        self.xaxis = np.mean(xpixels.reshape(cube.xgrid.shape[1:]), axis=0)
+        self.yaxis = np.mean(ypixels.reshape(cube.ygrid.shape[1:]), axis=1)
+        # self.xaxis = np.sort(np.unique(xpixels))
+        # self.yaxis = np.sort(np.unique(ypixels))
+        # self.shape = cube.xgrid.shape[1:]
+        self.header_datacube = cube.header
         self.compute_deflection_angles()
 
     def use_redshifts(
@@ -1526,15 +1560,15 @@ class GravLens:
     def compute_deflection_angles(self):
         '''Compute deflection angles in arcsec and pixels using redshifts
         '''
-        x_arcsec_raw = self.original_x_arcsec_deflect[self.idx].reshape(*self.shape)
-        y_arcsec_raw = self.original_y_arcsec_deflect[self.idx].reshape(*self.shape)
+        # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
+        # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
+        x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
+        y_arcsec_raw = self.interpolate_y_arcsec(self.yaxis, self.xaxis)
         self.x_arcsec_deflect = x_arcsec_raw * self.distance_ratio
         self.y_arcsec_deflect = y_arcsec_raw * self.distance_ratio
+        header = self.header_datacube if self.header_datacube else self.header
         self.x_pixel_deflect, self.y_pixel_deflect = self.convert_xy_arcsec_to_pixel(
-            self.x_arcsec_deflect, self.y_arcsec_deflect, header=self.header
-        )
-        self.deflect = np.moveaxis(
-            np.array([self.x_pixel_deflect, self.y_pixel_deflect]), 0, -1
+            self.x_arcsec_deflect, self.y_arcsec_deflect, header=header
         )
 
     @staticmethod
