@@ -184,7 +184,7 @@ Let's fit an example data; but it takes more than the least-square method, maybe
 #+RESULTS: uvfit-pbar
 :results:
 # Out[12]:
-100%|█████████████████████████████|5000/5000 [18:57<00:00,  4.40it/s]
+: 100%|███████████████████████|5000/5000 [18:57<00:00,  4.40it/s]
 :end:
 
 If you want to use parallelization, please see [TBD].
