@@ -746,7 +746,7 @@ class Cube(object):
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
         vv = self.vgrid - mom1[np.newaxis, ...]
-        mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / mom0
+        mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / mom0
         mom2[mom0 <= thresh] = None
         return mom2
 
@@ -789,7 +789,7 @@ class Cube(object):
                     pass
             mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
-            self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
+            self.mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
             return self.mom2
 
@@ -891,8 +891,7 @@ class Cube(object):
 
 
 class DataCube(Cube):
-    '''Cube class to contain an observed datacube.
-    '''
+    '''Cube class to contain an observed datacube.'''
 
     def perturbed(
         self,
@@ -1108,7 +1107,11 @@ class DirtyBeam:
     Contained data is dirtybeam images as a function of frequency.
     '''
 
-    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
+    def __init__(
+        self,
+        beam: np.ndarray,
+        header: Optional[fits.Header] = None,
+    ) -> None:
         self.original = beam
         self.imageplane = beam
         self.header = header
@@ -1317,7 +1320,7 @@ class DirtyBeam:
 
 
 class GravLens:
-    '''Deal with gravitational lensing effects based on a given lensed models.
+    '''Deal with gravitational lensing effects based on a given lens models.
 
     Contents are lensing parameters depending on positions.
     '''
@@ -1380,22 +1383,40 @@ class GravLens:
         index_hdul: int = 0,
         z_source: Optional[float] = None,
         z_lens: Optional[float] = None,
-        z_assumed: Optional[float] = None,
+        z_assumed: float = np.inf,
     ) -> GravLens:
         '''Constructer of ``GravLens``.
 
+        Either of the first three arguments are required to construct ``GravLens``.
+        If more thean one among the three are given, the earier argument take a priority
+        (i.e., xy_arcsec_deflect > xy_pixel_deflect > psi_arcsec).
+
         Args:
-            data_or_fname_gamma1 (Union[np.ndarray, str]): Data array or fits file
-                name of a lensing parmeter, gamma1.
-            data_or_fname_gamma2 (Union[np.ndarray, str]): Data array or fits file
-                name of a lensing parmeter, gamma2.
-            data_or_fname_kappa (Union[np.ndarray, str]): Data array or fits file
-                name of a lensing parmeter, kappa.
+            data_or_fname_xy_arcsec_deflect (Optional[Union[tuple[np.ndarray, ...],
+                tuple[str, ...]]]): Tuple of the data arrays or fits file names of
+                lensing parmeters, x-arcsec-deflect and y-arcsec-deflect.
+                Defaults to None.
+            data_or_fname_xy_pixel_deflect (Optional[Union[tuple[np.ndarray, ...],
+                tuple[str, ...]]]): Tuple of the data arrays or fits file names of
+                lensing parmeters, x-pixel-deflect and y-pixel-deflect.
+                Defaults to None.
+            data_or_fname_psi_arcsec (Optional[Union[np.ndarray, str]]): Data array
+                or fits file name of a lensing parmeter, psi. Note that this method
+                compute the gradient of psi to obtain the deflection angles, so that
+                significantly strong gravitational lensing might not be traced by psi.
+                Defaults to None.
             header (Optional[fits.Header], optional): Header of the fits file.
                 This method assumes that lensing parameter maps, gamma1, gamma2,
                 and kappa, have the same size and coordinates. Defaults to None.
             index_hdul (int, optional): Index of fits extensions of the fits file.
                 Defaults to 0.
+            z_source (Optional[float], optional): The source (galaxy) redshift.
+                Defaults to None.
+            z_lens (Optional[float], optional): The lens (cluster) redshift.
+                Defaults to None.
+            z_assumed (float, optional): The redshift assumed in the gravitational
+                parameters. If D_s / D_L = 1, the value should be infinite (``np.inf``).
+                Defaults to np.inf.
 
         Returns:
             GravLens: Instance of ``GravLens``.
@@ -1484,6 +1505,12 @@ class GravLens:
         )
 
     class LensingInterpolate:
+        '''Interpolate lensing effects to a data point.
+
+        This class method is implemented to convert the center of the model disk to
+        the image plane.
+        '''
+
         def __init__(
             self, xx: np.ndarray, yy: np.ndarray, z0: np.ndarray, z1: np.ndarray
         ) -> None:
@@ -1526,7 +1553,10 @@ class GravLens:
         self.compute_deflection_angles()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self,
+        z_source: float,
+        z_lens: float,
+        z_assumed: float = np.inf,
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1549,8 +1579,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.
-        '''
+        '''Reset the redshift infomation.'''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1558,8 +1587,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def compute_deflection_angles(self):
-        '''Compute deflection angles in arcsec and pixels using redshifts
-        '''
+        '''Compute deflection angles in arcsec and pixels using redshifts'''
         # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
@@ -1688,7 +1716,9 @@ class GravLens:
 
     @staticmethod
     def loadfits(
-        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0,
+        fname_x_deflect: str,
+        fname_y_deflect: str,
+        index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 
@@ -1882,7 +1912,10 @@ class GravLensOld:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self,
+        z_source: float,
+        z_lens: float,
+        z_assumed: float = np.inf,
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1908,8 +1941,7 @@ class GravLensOld:
         self.jacob = self.get_jacob()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.
-        '''
+        '''Reset the redshift infomation.'''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1925,7 +1957,7 @@ class GravLensOld:
         Returns:
             np.ndarray: Magnification map.
         '''
-        gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
+        gamma2 = self.gamma1**2 + self.gamma2**2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
@@ -1964,7 +1996,10 @@ class GravLensOld:
 
     @staticmethod
     def loadfits(
-        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
+        fname_gamma1: str,
+        fname_gamma2: str,
+        fname_kappa: str,
+        index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 
