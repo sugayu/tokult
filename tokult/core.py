@@ -31,7 +31,7 @@ class Tokult:
     Examples:
         >>> import tokult
         >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
-                                       ('gamma1.fits', 'gamma2.fits', 'kappa.fits'))
+                                       ('x-arcsec-deflect.fits', 'y-arcsec-deflect.fits'))
     '''
 
     def __init__(
@@ -1406,8 +1406,8 @@ class GravLens:
                 significantly strong gravitational lensing might not be traced by psi.
                 Defaults to None.
             header (Optional[fits.Header], optional): Header of the fits file.
-                This method assumes that lensing parameter maps, gamma1, gamma2,
-                and kappa, have the same size and coordinates. Defaults to None.
+                This method assumes that lensing parameter maps, x-arcsec-deflect and
+                y-arcsec-deflect, have the same size and coordinates. Defaults to None.
             index_hdul (int, optional): Index of fits extensions of the fits file.
                 Defaults to 0.
             z_source (Optional[float], optional): The source (galaxy) redshift.
@@ -1702,7 +1702,7 @@ class GravLens:
 
         Examples:
             >>> distance_ratio = gravlens.get_angular_distance_ratio(6.2, 0.9)
-            >>> gamma1_new = gamma1_old * distance_ratio
+            >>> x_deflect_new = x_deflect_old * distance_ratio
         '''
         D_S = c.cosmo.angular_diameter_distance(z_source)
         D_LS = c.cosmo.angular_diameter_distance_z1z2(z_lens, z_source)
