@@ -47,9 +47,10 @@ vv_grid: np.ndarray
 xslice: slice
 yslice: slice
 lensing: Callable = misc.no_lensing
+lensing_interpolation: Callable = misc.no_lensing_interpolation
 convolve: Callable = misc.no_convolve
 mask: Optional[np.ndarray] = None
-mask_FoV: np.ndarray
+# mask_FoV: np.ndarray
 
 # To fix parameters in fitting
 parameters_preset: Optional[np.ndarray]
@@ -65,6 +66,7 @@ def least_square(
     fix: Optional[FixParams] = None,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
     norm_weight: Optional[float] = None,
     mask_for_fit: Optional[np.ndarray] = None,
@@ -76,7 +78,11 @@ def least_square(
     '''
     if mode_fit == 'image':
         initialize_globalparameters_for_image(
-            datacube, func_convolve, func_lensing, mask_for_fit
+            datacube,
+            func_convolve,
+            func_lensing,
+            func_create_lensinginterp,
+            mask_for_fit,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -85,7 +91,12 @@ def least_square(
         if norm_weight is None:
             raise ValueError('Param "norm_weight" is necessary for uvfit.')
         initialize_globalparameters_for_uv(
-            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
+            datacube,
+            beam_vis,
+            norm_weight,
+            func_lensing,
+            func_create_lensinginterp,
+            mask_for_fit,
         )
         func_fit = construct_uvmodel
     else:
@@ -113,6 +124,7 @@ def montecarlo(
     func_convolve: Optional[Callable] = None,
     func_fullconvolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
     nperturb: int = 1000,
     niter: int = 1,
@@ -122,7 +134,7 @@ def montecarlo(
     '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
     '''
     initialize_globalparameters_for_image(
-        datacube, func_convolve, func_lensing, mask_for_fit
+        datacube, func_convolve, func_lensing, func_create_lensinginterp, mask_for_fit
     )
     func_fit = construct_convolvedmodel
 
@@ -153,6 +165,7 @@ def mcmc(
     fix: Optional[FixParams] = None,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
     norm_weight: Optional[float] = None,
     mask_for_fit: Optional[np.ndarray] = None,
@@ -169,7 +182,11 @@ def mcmc(
 
     if mode_fit == 'image':
         initialize_globalparameters_for_image(
-            datacube, func_convolve, func_lensing, mask_for_fit
+            datacube,
+            func_convolve,
+            func_lensing,
+            func_create_lensinginterp,
+            mask_for_fit,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -178,7 +195,12 @@ def mcmc(
         if norm_weight is None:
             raise ValueError('Parameter "norm_weight" is necessary for uvfit.')
         initialize_globalparameters_for_uv(
-            datacube, beam_vis, norm_weight, func_lensing, mask_for_fit
+            datacube,
+            beam_vis,
+            norm_weight,
+            func_lensing,
+            func_create_lensinginterp,
+            mask_for_fit,
         )
         func_fit = construct_uvmodel
     else:
@@ -213,7 +235,7 @@ def mcmc(
 def calculate_chi(params: tuple[float, ...], model_func: Callable,) -> np.ndarray:
     '''Calcurate chi = (data-model)/error for least square fitting
     '''
-    global mask
+    global cube, cube_error, mask
     model = model_func(params)
     if mask is not None:
         model = model[mask]
@@ -259,6 +281,7 @@ def calculate_log_prior(
 def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
+    global convolve
     model = construct_model_at_imageplane(params)
     model_convolved = convolve(model)
     # model_convolved = np.empty_like(model)
@@ -270,7 +293,7 @@ def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
-    global cube, cubeshape, yslice, xslice, beam_visibility, mask_FoV
+    global cubeshape, yslice, xslice
     model_cutout = construct_model_at_imageplane(params)
     model_image = np.zeros(cubeshape)
     model_image[:, yslice, xslice] = model_cutout
@@ -285,17 +308,20 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube on image plane using parameters and the grav. lensing.
     '''
+    global xx_grid, yy_grid, vv_grid
     _params = restore_params(params)
     p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = _params
 
+    coordinate_abs = np.moveaxis(np.array([xx_grid, yy_grid]), 0, -1)
+
     # velocity field
-    coord_image_v = np.moveaxis(np.array([xx_grid - p0, yy_grid - p1]), 0, -1)
-    rr, pphi = to_objectcoord_from(coord_image_v, PA=p2, incl=p3)
+    coord_v = to_relativecoord_from(coordinate_abs, at_x0=p0, at_y0=p1)
+    rr, pphi = to_objectcoord_from(coord_v, PA=p2, incl=p3)
     velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p6, rnorm=p4, incl=p3)
 
     # spatial intensity distribution
-    coord_image_i = np.moveaxis(np.array([xx_grid - p10, yy_grid - p11]), 0, -1)
-    rr_i, _ = to_objectcoord_from(coord_image_i, PA=p12, incl=p13)
+    coord_i = to_relativecoord_from(coordinate_abs, at_x0=p10, at_y0=p11)
+    rr_i, _ = to_objectcoord_from(coord_i, PA=p12, incl=p13)
     intensity = func.reciprocal_exp(rr_i, norm=p7, rnorm=p9)
 
     # create cube
@@ -304,37 +330,51 @@ def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
 
 
 def to_objectcoord_from(
-    coord_image: np.ndarray, PA: float, incl: float
+    coord_celestial: np.ndarray, PA: float, incl: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    '''Convert coordinates from imageplane to object polar coordinates.
+    '''Convert coordinates from celestial coordinates to object polar coordinates.
     '''
     pa = PA
     inclination = incl
 
-    coord_source = lensing(coord_image)
-    coord_object = misc.rotate_coord(coord_source, pa)
+    # coord_source = lensing(coord_image)
+    coord_object = misc.rotate_coord(coord_celestial, pa)
     xx, yy = np.moveaxis(coord_object, -1, 0)
     yy = yy / np.cos(inclination)
     r, phi = misc.polar_coord(xx, yy)
     return r, phi
 
 
+def to_relativecoord_from(
+    coord_source: np.ndarray, at_x0: float, at_y0: float
+) -> np.ndarray:
+    '''Convert coordinates from absolute positions to relative positions.
+    '''
+    global lensing_interpolation
+    central_position = lensing_interpolation(at_x0, at_y0)
+    return coord_source - central_position[np.newaxis, np.newaxis, :]
+
+
 def construct_model_at_imageplane_with(
     params: tuple[float, ...],
-    xx_grid: np.ndarray,
-    yy_grid: np.ndarray,
-    vv_grid: np.ndarray,
+    xx_grid_image: np.ndarray,
+    yy_grid_image: np.ndarray,
+    vv_grid_image: np.ndarray,
     lensing: Optional[Callable] = None,
+    create_interpolate_lensing: Optional[Callable] = None,
 ) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
-    lensing = misc.no_lensing if lensing is None else lensing
-    keys_globals = [
-        'xx_grid',
-        'yy_grid',
-        'vv_grid',
-        'lensing',
-    ]
+    lensing = lensing if lensing else misc.no_lensing
+    xx_grid, yy_grid = lensing(xx_grid_image[[0], :, :], yy_grid_image[[0], :, :])
+    vv_grid = vv_grid_image
+    lensing_interpolation = (
+        create_interpolate_lensing(xx_grid_image, yy_grid_image)
+        if create_interpolate_lensing
+        else misc.no_lensing_interpolation
+    )
+
+    keys_globals = ['xx_grid', 'yy_grid', 'vv_grid', 'lensing', 'lensing_interpolation']
     _globals = {}
 
     for k in keys_globals:
@@ -358,10 +398,13 @@ def construct_model_at_imageplane_with(
 def construct_model_moment0(params: list[float]) -> np.ndarray:
     '''Construct a model moment0 map convolved with dirtybeam.
     '''
+    global xx_grid, yy_grid
     p0, p1, p2, p3, p4, p5 = params
 
-    coord_image_i = np.moveaxis(np.array([xx_grid - p0, yy_grid - p1]), 0, -1)
-    rr_i, _ = to_objectcoord_from(coord_image_i, PA=p2, incl=p3)
+    coordinate_abs = np.moveaxis(np.array([xx_grid, yy_grid]), 0, -1)
+
+    coord_i = to_relativecoord_from(coordinate_abs, at_x0=p0, at_y0=p1)
+    rr_i, _ = to_objectcoord_from(coord_i, PA=p2, incl=p3)
     intensity = func.reciprocal_exp(rr_i, norm=p5, rnorm=p4)
     model = convolve(intensity)
 
@@ -371,10 +414,13 @@ def construct_model_moment0(params: list[float]) -> np.ndarray:
 def construct_model_moment1(params: list[float]) -> np.ndarray:
     '''Construct a model moment1 map convolved with dirtybeam.
     '''
+    global xx_grid, yy_grid
     p0, p1, p2, p3, p4, p5, p6 = params
 
-    coord_image_v = np.moveaxis(np.array([xx_grid - p5, yy_grid - p6]), 0, -1)
-    rr, pphi = to_objectcoord_from(coord_image_v, PA=p4, incl=p0)
+    coordinate_abs = np.moveaxis(np.array([xx_grid, yy_grid]), 0, -1)
+
+    coord_v = to_relativecoord_from(coordinate_abs, at_x0=p5, at_y0=p6)
+    rr, pphi = to_objectcoord_from(coord_v, PA=p4, incl=p0)
     velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p2, rnorm=p1, incl=p0)
     # # NOTE: convolving velocity is correct?
     # model = convolve(velocity, index=0)
@@ -789,13 +835,14 @@ def initialize_globalparameters_for_image(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the image plane.
     '''
     global cube, cube_error, xx_grid, yy_grid, vv_grid
-    global lensing, convolve, mask
+    global lensing, lensing_interpolation, convolve, mask
 
     cube = np.copy(datacube.imageplane)
     cube_error = datacube.rms()
@@ -805,10 +852,6 @@ def initialize_globalparameters_for_image(
         cube = cube[mask_for_fit]
         cube_error = np.broadcast_to(cube_error, cube.shape)
         cube_error = cube_error[mask_for_fit]
-    vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
-    yy_grid = yy_grid[[0], :, :]
-    xx_grid = xx_grid[[0], :, :]
-    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
@@ -816,18 +859,31 @@ def initialize_globalparameters_for_image(
     convolve = func_convolve if func_convolve else f_no_convolve
     lensing = func_lensing if func_lensing else f_no_lensing
 
+    vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
+    yy_grid = yy_grid_image[[0], :, :]
+    xx_grid = xx_grid_image[[0], :, :]
+    xx_grid, yy_grid = lensing(xx_grid, yy_grid)
+    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
+
+    lensing_interpolation = (
+        func_create_lensinginterp(xx_grid_image, yy_grid_image)
+        if func_create_lensinginterp
+        else misc.no_lensing_interpolation
+    )
+
 
 def initialize_globalparameters_for_uv(
     datacube: DataCube,
     beam_vis: np.ndarray,
     norm_weight: float,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
     global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
-    global lensing, beam_visibility, mask_FoV, mask
+    global lensing, lensing_interpolation, mask
 
     size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis / size
@@ -849,18 +905,24 @@ def initialize_globalparameters_for_uv(
     # varray = np.arange(datacube.vlim[0], datacube.vlim[1])
     # vv_grid, yy_grid, xx_grid = np.meshgrid(varray, yarray, xarray, indexing='ij')
 
-    vv_grid, yy_grid, xx_grid = datacube.coord_imageplane
-    yy_grid = yy_grid[[0], :, :]
-    xx_grid = xx_grid[[0], :, :]
+    # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
+    f_no_lensing: Callable = misc.no_lensing
+    lensing = func_lensing if func_lensing else f_no_lensing
+
+    vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
+    yy_grid = yy_grid_image[[0], :, :]
+    xx_grid = xx_grid_image[[0], :, :]
+    xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
     xslice, yslice = (datacube.xslice, datacube.yslice)
 
     # beam_visibility = beam_vis
-    mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
+    # mask_FoV = datacube.mask_FoV[datacube.vslice, :, :]
 
-    # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
-    f_no_lensing: Callable = misc.no_lensing
-    lensing = func_lensing if func_lensing else f_no_lensing
+    if func_create_lensinginterp:
+        lensing_interpolation = func_create_lensinginterp(xx_grid_image, yy_grid_image)
+    else:
+        lensing_interpolation = misc.no_lensing_interpolation
 
 
 class FixParams(NamedTuple):
@@ -1004,6 +1066,7 @@ def least_square_moment0(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     mask_use: Optional[np.ndarray] = None,
 ) -> list[float]:
     '''Least square fitting of moment 0 map.
@@ -1011,7 +1074,12 @@ def least_square_moment0(
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
     initialize_globalparameters_for_moment(
-        datacube, func_convolve, func_lensing, mom=0, mask_for_fit=mask_use
+        datacube,
+        func_convolve,
+        func_lensing,
+        func_create_lensinginterp,
+        mom=0,
+        mask_for_fit=mask_use,
     )
     func_fit = construct_model_moment0
 
@@ -1032,6 +1100,7 @@ def least_square_moment1(
     init: Sequence[float],
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
 ) -> list[float]:
     '''Least square fitting of moment 1 map.
 
@@ -1042,7 +1111,12 @@ def least_square_moment1(
     mask = np.isfinite(moment1)
 
     initialize_globalparameters_for_moment(
-        datacube, func_convolve, func_lensing, mom=1, mask_for_fit=mask
+        datacube,
+        func_convolve,
+        func_lensing,
+        func_create_lensinginterp,
+        mom=1,
+        mask_for_fit=mask,
     )
     func_fit = construct_model_moment1
 
@@ -1060,12 +1134,14 @@ def initialize_globalparameters_for_moment(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     mom: int = 0,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py.
     '''
-    global cube, cube_error, xx_grid, yy_grid, lensing, convolve, mask
+    global cube, cube_error, xx_grid, yy_grid
+    global lensing, lensing_interpolation, convolve, mask
 
     if mom == 0:
         cube = datacube.moment0()
@@ -1077,9 +1153,10 @@ def initialize_globalparameters_for_moment(
         cube = cube[idx]  # cube becomes 1d
         mom0 = datacube.moment0()[idx]
         cube_error = 1 / np.sqrt(mom0)
-    _, yy_grid, xx_grid = datacube.coord_imageplane
-    xx_grid = xx_grid[0, :, :]
-    yy_grid = yy_grid[0, :, :]
+    _, yy_grid_image, xx_grid_image = datacube.coord_imageplane
+    xx_grid = xx_grid_image[0, :, :]
+    yy_grid = yy_grid_image[0, :, :]
+    xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     mask = mask_for_fit
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
@@ -1087,6 +1164,11 @@ def initialize_globalparameters_for_moment(
     f_no_lensing: Callable = misc.no_lensing
     convolve = func_convolve if func_convolve else f_no_convolve
     lensing = func_lensing if func_lensing else f_no_lensing
+    lensing_interpolation = (
+        func_create_lensinginterp(xx_grid_image, yy_grid_image)
+        if func_create_lensinginterp
+        else misc.no_lensing_interpolation
+    )
 
 
 def map_globals_to_childprocesses(pool: Pool) -> None:
@@ -1102,9 +1184,10 @@ def map_globals_to_childprocesses(pool: Pool) -> None:
         'xslice',
         'yslice',
         'lensing',
+        'lensing_interpolation',
         'convolve',
         'mask',
-        'mask_FoV',
+        # 'mask_FoV',
         'parameters_preset',
         'index_free',
         'index_fixp_target',
