@@ -291,7 +291,7 @@ class Tokult:
             norm_weight = self.calculate_normweight()
         else:
             msg = '"DirtyBeam" is necessary for uvfit.'
-            c.logger.warning(msg)
+            c.logger.error(msg)
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
         func_create_lensinginterp = (
