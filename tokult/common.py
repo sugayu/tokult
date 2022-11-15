@@ -3,7 +3,7 @@
 from __future__ import annotations
 import os
 import pathlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Any
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
@@ -18,17 +18,21 @@ __all__: list = []
 
 
 ##
-@dataclass()
+@dataclass
 class ConfigParameters:
-    '''Configulation containing hyper parameters.'''
+    '''Configulation containing hyper parameters.
+    '''
 
     mcmc_init_dispersion: float = 0.001
-    mcmc_moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
+    mcmc_moves: list = field(
+        default_factory=lambda: [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
+    )
 
 
 @dataclass(frozen=True)
 class Config:
-    '''Configulation class containing constants.'''
+    '''Configulation class containing constants.
+    '''
 
     project: str
     fname_gamma1: Optional[str] = None
