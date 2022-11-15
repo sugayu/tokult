@@ -44,6 +44,7 @@ class Tokult:
         self.dirtybeam = dirtybeam
         self.gravlens = gravlens
         self.modelcube: Optional[ModelCube] = None
+        self.config = c.ConfigParameters()
 
     @classmethod
     def launch(
@@ -175,6 +176,7 @@ class Tokult:
 
         if optimization == 'mcmc':
             solution = fitting.mcmc(
+                self.config,
                 self.datacube,
                 init,
                 bound,
@@ -300,6 +302,7 @@ class Tokult:
 
         if optimization == 'mcmc':
             solution = fitting.mcmc(
+                self.config,
                 self.datacube,
                 init,
                 bound,

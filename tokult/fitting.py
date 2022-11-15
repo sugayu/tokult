@@ -17,7 +17,6 @@ import tqdm
 from typing import Callable, Sequence, Optional, Union, TYPE_CHECKING
 from typing import NamedTuple
 import emcee
-from emcee.moves import DEMove, DESnookerMove
 from multiprocessing.pool import Pool
 from . import function as func
 from . import misc
@@ -162,6 +161,7 @@ def montecarlo(
 
 
 def mcmc(
+    config: c.ConfigParameters,
     datacube: DataCube,
     init: Sequence[float],
     bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
@@ -217,7 +217,8 @@ def mcmc(
 
     ndim = len(_init)
     __init = np.array(_init)
-    __init = __init + __init * 0.001 * rng.standard_normal((nwalkers, ndim))
+    norm = rng.standard_normal((nwalkers, ndim))
+    __init = __init + __init * config.mcmc_init_dispersion * norm
 
     if pool is not None:
         map_globals_to_childprocesses(pool)
@@ -228,7 +229,7 @@ def mcmc(
         calculate_log_probability,
         args=args,
         pool=pool,
-        moves=[(DEMove(), 0.8), (DESnookerMove(), 0.2)],
+        moves=config.mcmc_moves,
     )
     sampler.run_mcmc(__init, nsteps, progress=progressbar)
 

@@ -9,6 +9,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 import astropy.constants as astroconst
 import astropy.units as u
+from emcee.moves import DEMove, DESnookerMove
 import logging
 from logging.config import dictConfig
 from configparser import ConfigParser
@@ -17,10 +18,17 @@ __all__: list = []
 
 
 ##
+@dataclass()
+class ConfigParameters:
+    '''Configulation containing hyper parameters.'''
+
+    mcmc_init_dispersion: float = 0.001
+    mcmc_moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
+
+
 @dataclass(frozen=True)
 class Config:
-    '''Configulation class containing constants.
-    '''
+    '''Configulation class containing constants.'''
 
     project: str
     fname_gamma1: Optional[str] = None
@@ -55,8 +63,7 @@ class Config:
 
     @classmethod
     def from_configparser(cls, file_init: str) -> Config:
-        '''Return instance of Config with reading parameters from config.ini
-        '''
+        '''Return instance of Config with reading parameters from config.ini'''
         config_ini = cls.configparser(file_init)
         conf_dict = cls.convert_config2dict(config_ini)
         conf_dict_any = cls.convert_configtypes(conf_dict)
@@ -64,8 +71,7 @@ class Config:
 
     @staticmethod
     def configparser(file_init: str) -> ConfigParser:
-        '''wrapper of ConfigParser.
-        '''
+        '''wrapper of ConfigParser.'''
         config_ini = ConfigParser(inline_comment_prefixes='#')
         if not os.path.exists(file_init):
             logger.warning('No config.ini file: ' + file_init)
@@ -75,8 +81,7 @@ class Config:
 
     @staticmethod
     def convert_config2dict(config: ConfigParser) -> dict[str, str]:
-        '''Convert data types of configure.
-        '''
+        '''Convert data types of configure.'''
         list_section = ['glavlens', 'casa']
         output_dict: dict[str, str] = dict(config['DEFAULT'].items())
         for section in list_section:
@@ -87,8 +92,7 @@ class Config:
 
     @staticmethod
     def convert_configtypes(config_dict: dict[str, str]) -> dict[str, Any]:
-        '''Convert data types of configure.
-        '''
+        '''Convert data types of configure.'''
         keytypes = {'z': float, 'num_pix': int, 'chan_start': int, 'chan_end': int}
         for k, f in keytypes.items():
             if k in config_dict.keys():
@@ -97,8 +101,7 @@ class Config:
 
 
 class FileManager:
-    '''Manage all the file names used in tokult.
-    '''
+    '''Manage all the file names used in tokult.'''
 
     def __init__(self, config: Config) -> None:
         self.conf: Config = config
@@ -107,8 +110,7 @@ class FileManager:
         self.log: str = self.dname_project + 'tokult.log'
 
     def readconfig_gravlens(self) -> None:
-        '''Read config about gravitational lensing to define filename variables
-        '''
+        '''Read config about gravitational lensing to define filename variables'''
         self.dname_gl: str = 'gravlens/'
         self.gamma1: str = 'gamma1.fits'
         self.gamma2: str = 'gamma2.fits'
@@ -116,8 +118,7 @@ class FileManager:
         self.gravlens: str = 'gravlens.txt'
 
     def readconfig_casa(self) -> None:
-        '''Read config about CASA analyses to define filename variables
-        '''
+        '''Read config about CASA analyses to define filename variables'''
         if self.conf.fname_ms is None:
             raise ValueError('self.conf.fname_ms is None.')
         self.ms: str = self.conf.fname_ms
@@ -190,8 +191,7 @@ def initialize_tokult(file_init: Optional[str] = None) -> None:
 
 
 def get_dictconfig_logging(fnames_log: str) -> dict[str, Any]:
-    '''Get dictconfig for logger
-    '''
+    '''Get dictconfig for logger'''
     return {
         'version': 1,
         'formatters': {
