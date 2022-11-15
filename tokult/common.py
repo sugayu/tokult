@@ -9,6 +9,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 import astropy.constants as astroconst
 import astropy.units as u
+from emcee.moves import DEMove, DESnookerMove
 import logging
 from logging.config import dictConfig
 from configparser import ConfigParser
@@ -22,6 +23,7 @@ class ConfigParameters:
     '''Configulation containing hyper parameters.'''
 
     mcmc_init_dispersion: float = 0.001
+    mcmc_moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
 
 
 @dataclass(frozen=True)
