@@ -13,11 +13,11 @@ You can download the data from the terminal with:
 #+end_src
 
 The donwloaded data are:
-- ~mockcube_dirty_tutorial.fits~ :: The ALMA mock dirty cube with /natural/ weighting.
-- ~cube_dirty_tutorial.psf.fits~ :: The ALMA dirty beam with /natural/ weighting.
-- ~cube_dirty_tutorial_uniform.psf.fits~ :: The ALMA dirty beam with /uniform/ weighting.
-- ~x-arcsec-deflection_tutorial.fits~ :: The map of the deflection angles along the \(x\) axis.
-- ~y-arcsec-deflection_tutorial.fits~ :: The map of the deflection angles along the \(y\) axis.
+- ~tokult_mockcube_dirty.fits~ :: The ALMA mock dirty cube with /natural/ weighting.
+- ~tokult_cube_dirty.psf.fits~ :: The ALMA dirty beam with /natural/ weighting.
+- ~tokult_cube_dirty_uniform.psf.fits~ :: The ALMA dirty beam with /uniform/ weighting.
+- ~tokult_x-arcsec-deflect.fits~ :: The map of the deflection angles along the \(x\) axis.
+- ~tokult_y-arcsec-deflect.fits~ :: The map of the deflection angles along the \(y\) axis.
 
 # #+begin_src ipython :exports both :results raw drawer
 #   import os
@@ -38,9 +38,9 @@ First of all, import the Tokult package and then launch ~Tokult~ by inputting th
   import tokult
 
   tok = tokult.Tokult.launch(
-      'mockcube_dirty_tutorial.fits',
-      'cube_dirty_tutorial.psf.fits',
-      ('x-arcsec-deflection_tutorial.fits', 'y-arcsec-deflection_tutorial.fits'),
+      'tokult_mockcube_dirty.fits',
+      'tokult_cube_dirty.psf.fits',
+      ('tokult_x-arcsec-deflect.fits', 'tokult_y-arcsec-deflect.fits'),
   )
 #+end_src
 
@@ -56,11 +56,12 @@ and the third takes the lensing parameters summarized in a tuple.
 
 Next, Tokult needs to know which cubic region you want to use for the model fitting.
 The current code does not work without specifying the region.
-In addition, the lensing parameters (x-deflection and y-deflection) need redshifts of the lensing cluster and the target object.
+In addition, the lensing parameters (x-deflection and y-deflection) need redshifts of the lensing cluster and the target object;
+in this tutorial, the cluster and mock galaxy are assumed at z = 0.541 and z = 1.7, respectively.
 ~tok~ can take these parameters with the methods ~use_region()~ and ~use_redshifts()~.
 #+begin_src ipython :exports code :results raw drawer
   tok.use_region(xlim=(32, 96), ylim=(32, 96), vlim=(5, 12))
-  # tok.use_redshifts(z_lens=0.541, z_source=1000)  # not used in this tutorial.
+  tok.use_redshifts(z_lens=0.541, z_source=1.7)
 #+end_src
 
 #+RESULTS:
@@ -79,8 +80,8 @@ The /uv/ coverage can be obtained from a dirty beam created with /uniform/ weigh
   import numpy as np
   from astropy.io import fits
 
-  hudl = fits.open('cube_dirty_tutorial_uniform.psf.fits')
-  uvpsf_uniform = tokult.misc.rfft2(np.squeeze(hudl[0].data))
+  data = fits.getdata('tokult_cube_dirty_uniform.psf.fits')
+  uvpsf_uniform = tokult.misc.rfft2(np.squeeze(data))
   uvcoverage = (uvpsf_uniform[tok.datacube.vslice, :, :]) > 1.0e-5  # This value 1.0e-5 is like arbitrary.
 #+end_src
 
