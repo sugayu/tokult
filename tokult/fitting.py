@@ -1058,17 +1058,22 @@ def initialguess(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     is_separate: bool = False,
 ) -> InputParams:
     '''Guess initial parameters by fitting moment 0 and 1 maps.
     '''
-    param0 = least_square_moment0(datacube, func_convolve, func_lensing)
+    param0 = least_square_moment0(
+        datacube, func_convolve, func_lensing, func_create_lensinginterp
+    )
 
     p = param0
     vcen = np.sum(datacube.vlim) / 2.0
     init = [p[3], p[4], 1.0, vcen, p[2], p[0], p[1]]
 
-    param1 = least_square_moment1(datacube, init, func_convolve, func_lensing)
+    param1 = least_square_moment1(
+        datacube, init, func_convolve, func_lensing, func_create_lensinginterp
+    )
 
     if not is_separate:
         param1[5] = param0[0]
