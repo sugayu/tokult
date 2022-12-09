@@ -541,7 +541,7 @@ class Tokult:
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
         uvpsf = misc.rfft2(self.dirtybeam.original)
-        uv_noise = uv / np.sqrt(abs(uvpsf.real))
+        uv_noise = uv / uvpsf * np.sqrt(abs(uvpsf.real))
 
         v0, v1 = self.datacube.vlim
         n = uv_noise[[v0 - 1, v1], :, :].real
@@ -1582,7 +1582,8 @@ class GravLens:
         self.compute_deflection_angles()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.'''
+        '''Reset the redshift infomation.
+        '''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1590,7 +1591,8 @@ class GravLens:
         self.compute_deflection_angles()
 
     def compute_deflection_angles(self):
-        '''Compute deflection angles in arcsec and pixels using redshifts'''
+        '''Compute deflection angles in arcsec and pixels using redshifts
+        '''
         # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
