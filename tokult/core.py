@@ -364,8 +364,15 @@ class Tokult:
         '''
         func_convolve = self.dirtybeam.convolve if self.dirtybeam else None
         func_lensing = self.gravlens.lensing if self.gravlens else None
+        func_create_lensinginterp = (
+            self.gravlens.create_interpolate_lensing if self.gravlens else None
+        )
         return fitting.initialguess(
-            self.datacube, func_convolve, func_lensing, is_separate
+            datacube=self.datacube,
+            func_convolve=func_convolve,
+            func_lensing=func_lensing,
+            func_create_lensinginterp=func_create_lensinginterp,
+            is_separate=is_separate,
         )
 
     def use_region(
@@ -534,7 +541,7 @@ class Tokult:
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
         uvpsf = misc.rfft2(self.dirtybeam.original)
-        uv_noise = uv / np.sqrt(abs(uvpsf.real))
+        uv_noise = uv / uvpsf * np.sqrt(abs(uvpsf.real))
 
         v0, v1 = self.datacube.vlim
         n = uv_noise[[v0 - 1, v1], :, :].real
@@ -749,7 +756,7 @@ class Cube(object):
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
         vv = self.vgrid - mom1[np.newaxis, ...]
-        mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / mom0
+        mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / mom0
         mom2[mom0 <= thresh] = None
         return mom2
 
@@ -792,7 +799,7 @@ class Cube(object):
                     pass
             mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
-            self.mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / self.mom0
+            self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
             return self.mom2
 
@@ -1110,11 +1117,7 @@ class DirtyBeam:
     Contained data is dirtybeam images as a function of frequency.
     '''
 
-    def __init__(
-        self,
-        beam: np.ndarray,
-        header: Optional[fits.Header] = None,
-    ) -> None:
+    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
         self.original = beam
         self.imageplane = beam
         self.header = header
@@ -1556,10 +1559,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def use_redshifts(
-        self,
-        z_source: float,
-        z_lens: float,
-        z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1582,7 +1582,8 @@ class GravLens:
         self.compute_deflection_angles()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.'''
+        '''Reset the redshift infomation.
+        '''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1590,7 +1591,8 @@ class GravLens:
         self.compute_deflection_angles()
 
     def compute_deflection_angles(self):
-        '''Compute deflection angles in arcsec and pixels using redshifts'''
+        '''Compute deflection angles in arcsec and pixels using redshifts
+        '''
         # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
@@ -1719,9 +1721,7 @@ class GravLens:
 
     @staticmethod
     def loadfits(
-        fname_x_deflect: str,
-        fname_y_deflect: str,
-        index_hdul: int = 0,
+        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 
@@ -1915,10 +1915,7 @@ class GravLensOld:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self,
-        z_source: float,
-        z_lens: float,
-        z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1960,7 +1957,7 @@ class GravLensOld:
         Returns:
             np.ndarray: Magnification map.
         '''
-        gamma2 = self.gamma1**2 + self.gamma2**2
+        gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
@@ -1999,10 +1996,7 @@ class GravLensOld:
 
     @staticmethod
     def loadfits(
-        fname_gamma1: str,
-        fname_gamma2: str,
-        fname_kappa: str,
-        index_hdul: int = 0,
+        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 

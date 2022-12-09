@@ -74,7 +74,8 @@ def least_square(
     mode_fit: str = 'image',
     is_separate: bool = False,
 ) -> Solution:
-    '''Least square fitting using scipy.optimize.least_squares'''
+    '''Least square fitting using scipy.optimize.least_squares
+    '''
     if mode_fit == 'image':
         initialize_globalparameters_for_image(
             datacube,
@@ -132,7 +133,8 @@ def montecarlo(
     is_separate: bool = False,
     progressbar: bool = False,
 ) -> Solution:
-    '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares'''
+    '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
+    '''
     initialize_globalparameters_for_image(
         datacube, func_convolve, func_lensing, func_create_lensinginterp, mask_for_fit
     )
@@ -179,7 +181,8 @@ def mcmc(
     pool: Optional[Pool] = None,
     progressbar: bool = False,
 ) -> Solution:
-    '''MCMC using emcee'''
+    '''MCMC using emcee
+    '''
     rng = default_rng(222)
 
     if mode_fit == 'image':
@@ -237,11 +240,9 @@ def mcmc(
     return Solution.from_sampler(sampler, dof, func_fit)
 
 
-def calculate_chi(
-    params: tuple[float, ...],
-    model_func: Callable,
-) -> np.ndarray:
-    '''Calcurate chi = (data-model)/error for least square fitting'''
+def calculate_chi(params: tuple[float, ...], model_func: Callable,) -> np.ndarray:
+    '''Calcurate chi = (data-model)/error for least square fitting
+    '''
     global cube, cube_error, mask
     model = model_func(params)
     if mask is not None:
@@ -263,7 +264,8 @@ def calculate_log_probability(
     model_func: Callable,
     bound: tuple[Sequence[float], Sequence[float]],
 ) -> float:
-    '''Calcurate log probability for MCMC technique.'''
+    '''Calcurate log probability for MCMC technique.
+    '''
     log_prior = calculate_log_prior(params, bound)
     if not np.isfinite(log_prior):
         return -np.inf
@@ -275,7 +277,8 @@ def calculate_log_probability(
 def calculate_log_prior(
     params: tuple[float, ...], bound: tuple[Sequence[float], Sequence[float]]
 ) -> float:
-    '''Calcurate log prior of parameters for MCMC technique.'''
+    '''Calcurate log prior of parameters for MCMC technique.
+    '''
     _params = np.array(params)
     bound0, bound1 = (np.array(bound[0]), np.array(bound[1]))
     if np.all(bound0 < _params) and np.all(_params < bound1):
@@ -284,7 +287,8 @@ def calculate_log_prior(
 
 
 def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
-    '''Construct a model detacube convolved with dirtybeam.'''
+    '''Construct a model detacube convolved with dirtybeam.
+    '''
     global convolve
     model = construct_model_at_imageplane(params)
     model_convolved = convolve(model)
@@ -295,7 +299,8 @@ def construct_convolvedmodel(params: tuple[float, ...]) -> np.ndarray:
 
 
 def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
-    '''Construct a model detacube convolved with dirtybeam.'''
+    '''Construct a model detacube convolved with dirtybeam.
+    '''
     global cubeshape, yslice, xslice
     model_cutout = construct_model_at_imageplane(params)
     model_image = np.zeros(cubeshape)
@@ -309,7 +314,8 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
 
 
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
-    '''Construct a model detacube on image plane using parameters and the grav. lensing.'''
+    '''Construct a model detacube on image plane using parameters and the grav. lensing.
+    '''
     global xx_grid, yy_grid, vv_grid
     _params = restore_params(params)
     p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = _params
@@ -319,7 +325,7 @@ def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     # velocity field
     coord_v = to_relativecoord_from(coordinate_abs, at_x0=p0, at_y0=p1)
     rr, pphi = to_objectcoord_from(coord_v, PA=p2, incl=p3)
-    velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=10.0**p6, rnorm=p4, incl=p3)
+    velocity = p5 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p6, rnorm=p4, incl=p3)
 
     # spatial intensity distribution
     coord_i = to_relativecoord_from(coordinate_abs, at_x0=p10, at_y0=p11)
@@ -334,7 +340,8 @@ def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
 def to_objectcoord_from(
     coord_celestial: np.ndarray, PA: float, incl: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    '''Convert coordinates from celestial coordinates to object polar coordinates.'''
+    '''Convert coordinates from celestial coordinates to object polar coordinates.
+    '''
     pa = PA
     inclination = incl
 
@@ -349,7 +356,8 @@ def to_objectcoord_from(
 def to_relativecoord_from(
     coord_source: np.ndarray, at_x0: float, at_y0: float
 ) -> np.ndarray:
-    '''Convert coordinates from absolute positions to relative positions.'''
+    '''Convert coordinates from absolute positions to relative positions.
+    '''
     global lensing_interpolation
     central_position = lensing_interpolation(at_x0, at_y0)
     return coord_source - central_position[np.newaxis, np.newaxis, :]
@@ -363,7 +371,8 @@ def construct_model_at_imageplane_with(
     lensing: Optional[Callable] = None,
     create_interpolate_lensing: Optional[Callable] = None,
 ) -> np.ndarray:
-    '''Construct a model detacube convolved with dirtybeam.'''
+    '''Construct a model detacube convolved with dirtybeam.
+    '''
     lensing = lensing if lensing else misc.no_lensing
     xx_grid, yy_grid = lensing(xx_grid_image[[0], :, :], yy_grid_image[[0], :, :])
     vv_grid = vv_grid_image
@@ -395,7 +404,8 @@ def construct_model_at_imageplane_with(
 
 
 def construct_model_moment0(params: list[float]) -> np.ndarray:
-    '''Construct a model moment0 map convolved with dirtybeam.'''
+    '''Construct a model moment0 map convolved with dirtybeam.
+    '''
     global xx_grid, yy_grid
     p0, p1, p2, p3, p4, p5 = params
 
@@ -410,7 +420,8 @@ def construct_model_moment0(params: list[float]) -> np.ndarray:
 
 
 def construct_model_moment1(params: list[float]) -> np.ndarray:
-    '''Construct a model moment1 map convolved with dirtybeam.'''
+    '''Construct a model moment1 map convolved with dirtybeam.
+    '''
     global xx_grid, yy_grid
     p0, p1, p2, p3, p4, p5, p6 = params
 
@@ -418,7 +429,7 @@ def construct_model_moment1(params: list[float]) -> np.ndarray:
 
     coord_v = to_relativecoord_from(coordinate_abs, at_x0=p5, at_y0=p6)
     rr, pphi = to_objectcoord_from(coord_v, PA=p4, incl=p0)
-    velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=10.0**p2, rnorm=p1, incl=p0)
+    velocity = p3 + func.freeman_disk(rr, pphi, mass_dyn=10.0 ** p2, rnorm=p1, incl=p0)
     # # NOTE: convolving velocity is correct?
     # model = convolve(velocity, index=0)
 
@@ -426,7 +437,8 @@ def construct_model_moment1(params: list[float]) -> np.ndarray:
 
 
 class Solution:
-    '''Contains output solutions of fittings.'''
+    '''Contains output solutions of fittings.
+    '''
 
     def __init__(
         self,
@@ -462,7 +474,8 @@ class Solution:
     def from_leastsquare(
         cls, output: OptimizeResult, chi2: float, dof: float
     ) -> Solution:
-        '''Construct Solution() from output of least_square.'''
+        '''Construct Solution() from output of least_square.
+        '''
         p_bestfit = output.x
         J = output.jac
         # residuals_lsq = Ivalues - model_func(xvalues, yvalues, Vvalues, param_result)
@@ -488,7 +501,8 @@ class Solution:
         func_fit: Callable,
         # mask_for_fit: Optional[np.ndarray] = None,
     ) -> Solution:
-        '''Construct Solution() from sampler.'''
+        '''Construct Solution() from sampler.
+        '''
         try:
             tau = sampler.get_autocorr_time()
             burnin = int(np.max(tau) * 2.0)
@@ -523,7 +537,8 @@ class Solution:
 
     @classmethod
     def from_montecarlo(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
-        '''Construct Solution() from montecarlo perturbations.'''
+        '''Construct Solution() from montecarlo perturbations.
+        '''
         p16, p50, p84 = np.percentile(params, [16, 50, 84], axis=0)
         best = restore_params(p50)
         error_high = restore_params(p84 - p50)
@@ -542,7 +557,8 @@ class Solution:
     def set_metainfo(
         self, z: Optional[float] = None, header: Optional[fits.Header] = None
     ) -> None:
-        '''Set meta infomation used in Solution'''
+        '''Set meta infomation used in Solution
+        '''
         keys_arguments = ['z', 'header']
 
         for k in keys_arguments:
@@ -551,7 +567,8 @@ class Solution:
 
     @dataclass
     class MetaInfoOfSolution:
-        '''Meta data container of Solution.'''
+        '''Meta data container of Solution.
+        '''
 
         z: float = 0.0
         header: Optional[fits.Header] = None
@@ -559,7 +576,8 @@ class Solution:
     def add_units(
         self, params: Optional[Union[InputParams, np.ndarray]] = None
     ) -> FitParamsWithUnits:
-        '''Get best parameters with physical units.'''
+        '''Get best parameters with physical units.
+        '''
         if params is None:
             return self.best.to_units(header=self.meta.header, redshift=self.meta.z)
         elif isinstance(params, InputParams):
@@ -572,7 +590,8 @@ class Solution:
     def restore_params(
         self, params: Union[np.ndarray, tuple[float, ...]]
     ) -> Union[np.ndarray, tuple[float, ...]]:
-        '''Restore parameters with pfix by inserting parameters into params.'''
+        '''Restore parameters with pfix by inserting parameters into params.
+        '''
         if (parameters_preset is None) or (len(params) == 14):
             return params
 
@@ -594,7 +613,8 @@ class Solution:
 
 
 class InputParams(NamedTuple):
-    '''Input parameters for construct_model_at_imageplane.'''
+    '''Input parameters for construct_model_at_imageplane.
+    '''
 
     x0_dyn: float  #: the coordinate on x-axis
     y0_dyn: float
@@ -614,12 +634,14 @@ class InputParams(NamedTuple):
     def to_units(
         self, header: fits.Header, redshift: float = 0.0
     ) -> FitParamsWithUnits:
-        '''Return input parameters with units.'''
+        '''Return input parameters with units.
+        '''
         return FitParamsWithUnits.from_inputparams(self, header, redshift)
 
 
 class InputParamsArray(NamedTuple):
-    '''Input parameter array for construct_model_at_imageplane.'''
+    '''Input parameter array for construct_model_at_imageplane.
+    '''
 
     x0_dyn: np.ndarray
     y0_dyn: np.ndarray
@@ -639,7 +661,8 @@ class InputParamsArray(NamedTuple):
     def to_units(
         self, header: fits.Header, redshift: float = 0.0
     ) -> FitParamsWithUnits:
-        '''Return input parameters with units.'''
+        '''Return input parameters with units.
+        '''
         return FitParamsWithUnits.from_inputparams(self, header, redshift)
 
     @classmethod
@@ -649,7 +672,8 @@ class InputParamsArray(NamedTuple):
 
 @dataclass
 class FitParamsWithUnits:
-    '''Fitting parameters with units.'''
+    '''Fitting parameters with units.
+    '''
 
     x0_dyn: u.Quantity
     y0_dyn: u.Quantities
@@ -700,7 +724,8 @@ class FitParamsWithUnits:
             self.diskmassscale = None
 
     def to_physicalscale(self) -> None:
-        '''Convert values to physicalscales.'''
+        '''Convert values to physicalscales.
+        '''
         if self.header is None:
             raise ValueError('header is not input.')
         assert isinstance(self.wcs, WCS)
@@ -723,7 +748,7 @@ class FitParamsWithUnits:
         self.radius_dyn = self.radius_dyn.to(u.arcsec, self.pixelscale)
         self.radius_emi = self.radius_emi.to(u.arcsec, self.pixelscale)
         self.brightness_center = self.brightness_center.to(
-            u.Jy / u.arcsec**2, self.pixelscale
+            u.Jy / u.arcsec ** 2, self.pixelscale
         )
         self.velocity_dispersion = self.velocity_dispersion.to(
             u.km / u.s, self.vpixelscale
@@ -735,7 +760,8 @@ class FitParamsWithUnits:
             self.mass_dyn = self.mass_dyn.physical.to(u.Msun, self.diskmassscale)
 
     def vmax(self):
-        '''Maximum rotation velcoity.'''
+        '''Maximum rotation velcoity.
+        '''
         return func.maximum_rotation_velocity(self.mass_dyn, self.radius_dyn)
 
     @classmethod
@@ -745,7 +771,8 @@ class FitParamsWithUnits:
         header: Optional[fits.Header] = None,
         z: float = 0.0,
     ) -> FitParamsWithUnits:
-        '''Constructer from InputParams'''
+        '''Constructer from InputParams
+        '''
         dictionary = inputparams._asdict()
         input_dict = {}
         units = (
@@ -755,7 +782,7 @@ class FitParamsWithUnits:
             u.rad,
             u.pix,
             u.pix,
-            u.dex(u.pix**3),
+            u.dex(u.pix ** 3),
             u.Jy / u.pix / u.pix,
             u.pix,
             u.pix,
@@ -791,7 +818,8 @@ def get_bound_params(
     PA_emi: tuple[float, float] = (0.0, 2 * np.pi),
     inclination_emi: tuple[float, float] = (0.0, np.pi / 2),
 ) -> tuple[InputParams, InputParams]:
-    '''Return bound parameters.'''
+    '''Return bound parameters.
+    '''
 
     def _bound(i: int) -> InputParams:
         return InputParams(
@@ -818,9 +846,10 @@ def get_bound_params(
 def is_init_outside_of_bound(
     init: tuple[float, ...], bound: tuple[tuple[float, ...], tuple[float, ...]]
 ) -> bool:
-    '''Return True if init is outside of bound.'''
-    for i, b in zip(init, bound):
-        b0, b1 = b
+    '''Return True if init is outside of bound.
+    '''
+    bound0, bound1 = bound
+    for i, b0, b1 in zip(init, bound0, bound1):
         if (i < b0) | (b1 < i):
             return True
     return False
@@ -834,7 +863,8 @@ def initialize_globalparameters_for_image(
     beam_vis: Optional[np.ndarray] = None,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
-    '''Set global parameters used in fitting.py in the image plane.'''
+    '''Set global parameters used in fitting.py in the image plane.
+    '''
     global cube, cube_error, xx_grid, yy_grid, vv_grid
     global lensing, lensing_interpolation, convolve, mask
 
@@ -842,14 +872,15 @@ def initialize_globalparameters_for_image(
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
     mask = mask_for_fit
-    if not np.any(mask):
-        raise ValueError(
-            'We believe that you don\'t want to use "mask_for_fit" filled by False.'
-        )
     if mask_for_fit is not None:
-        cube = cube[mask_for_fit]
+        print(np.any(mask_for_fit))
+        if not np.any(mask_for_fit):
+            raise ValueError(
+                '"mask_for_fit" filled by False. We believe that you don\'t want to use it.'
+            )
+        cube = cube[mask]
         cube_error = np.broadcast_to(cube_error, cube.shape)
-        cube_error = cube_error[mask_for_fit]
+        cube_error = cube_error[mask]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
@@ -878,7 +909,8 @@ def initialize_globalparameters_for_uv(
     func_create_lensinginterp: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
-    '''Set global parameters used in fitting.py in the uv plane.'''
+    '''Set global parameters used in fitting.py in the uv plane.
+    '''
     global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
     global lensing, lensing_interpolation, mask
 
@@ -927,7 +959,8 @@ def initialize_globalparameters_for_uv(
 
 
 class FixParams(NamedTuple):
-    '''Fixed parameters for construct_model_at_imageplane.'''
+    '''Fixed parameters for construct_model_at_imageplane.
+    '''
 
     x0_dyn: Optional[float] = None
     y0_dyn: Optional[float] = None
@@ -1012,7 +1045,8 @@ def restore_params(params: tuple[float, ...]) -> tuple[float, ...]:
 def shorten_init_and_bound_ifneeded(
     init: Sequence[float], bound: tuple[Sequence[float], Sequence[float]]
 ) -> tuple[tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
-    '''Shorten init and bound parameter to match appropreate lengths.'''
+    '''Shorten init and bound parameter to match appropreate lengths.
+    '''
     global index_free
     new_init = tuple(np.array(init)[index_free])
     new_bound0 = tuple(np.array(bound[0])[index_free])
@@ -1024,16 +1058,22 @@ def initialguess(
     datacube: DataCube,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
+    func_create_lensinginterp: Optional[Callable] = None,
     is_separate: bool = False,
 ) -> InputParams:
-    '''Guess initial parameters by fitting moment 0 and 1 maps.'''
-    param0 = least_square_moment0(datacube, func_convolve, func_lensing)
+    '''Guess initial parameters by fitting moment 0 and 1 maps.
+    '''
+    param0 = least_square_moment0(
+        datacube, func_convolve, func_lensing, func_create_lensinginterp
+    )
 
     p = param0
     vcen = np.sum(datacube.vlim) / 2.0
     init = [p[3], p[4], 1.0, vcen, p[2], p[0], p[1]]
 
-    param1 = least_square_moment1(datacube, init, func_convolve, func_lensing)
+    param1 = least_square_moment1(
+        datacube, init, func_convolve, func_lensing, func_create_lensinginterp
+    )
 
     if not is_separate:
         param1[5] = param0[0]
