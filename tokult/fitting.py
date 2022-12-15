@@ -506,7 +506,7 @@ class Solution:
         try:
             tau = sampler.get_autocorr_time()
             burnin = int(np.max(tau) * 2.0)
-            thin = int(np.min(tau) * 2.0)
+            thin = int(np.min(tau) / 2.0)
         except emcee.autocorr.AutocorrError:
             c.logger.warning(
                 'MCMC may not be converged.'
@@ -916,7 +916,7 @@ def initialize_globalparameters_for_uv(
 
     size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis / size
-    cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
+    cube_error = np.sqrt(abs(beam_vis.real)) / beam_vis / np.sqrt(norm_weight) / size
     cubeshape = datacube.original[datacube.vslice, :, :].shape
     # sigma = (cube / cube_error).real
     # mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
