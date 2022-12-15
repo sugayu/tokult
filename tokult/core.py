@@ -1518,13 +1518,17 @@ class GravLens:
         '''
 
         def __init__(
-            self, xx: np.ndarray, yy: np.ndarray, z0: np.ndarray, z1: np.ndarray
+            self,
+            xx: np.ndarray,
+            yy: np.ndarray,
+            x_pixel_deflect: np.ndarray,
+            y_pixel_deflect: np.ndarray,
         ) -> None:
-            self.f0 = RectBivariateSpline(yy, xx, z0)
-            self.f1 = RectBivariateSpline(yy, xx, z1)
+            self.fx = RectBivariateSpline(yy, xx, x_pixel_deflect)
+            self.fy = RectBivariateSpline(yy, xx, y_pixel_deflect)
 
-        def __call__(self, y: np.ndarray, x: np.ndarray) -> np.ndarray:
-            return np.squeeze(np.array([x - self.f0(y, x), y - self.f1(y, x)]))
+        def __call__(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+            return np.squeeze(np.array([x - self.fx(y, x), y - self.fy(y, x)]))
 
     def match_wcs_with(self, cube: DataCube) -> None:
         '''Match the world coordinate system with the input data cube.
