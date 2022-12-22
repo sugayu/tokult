@@ -31,7 +31,7 @@ class Tokult:
     Examples:
         >>> import tokult
         >>> tok = tokult.Tokult.launch('data.fits', 'psf.fits',
-                                       ('x-arcsec-deflect.fits', 'y-arcsec-deflect.fits'))
+                                     ('x-arcsec-deflect.fits', 'y-arcsec-deflect.fits'))
     '''
 
     def __init__(
@@ -543,10 +543,14 @@ class Tokult:
         uvpsf = misc.rfft2(self.dirtybeam.original)
         uv_noise = uv / uvpsf * np.sqrt(abs(uvpsf.real))
 
+        # Noise computed from side channels of (v0-1, v1)
+        # Pixels where xlim=(1:-1) should be gaussian noise both in real and imag parts.
         v0, v1 = self.datacube.vlim
-        n = uv_noise[[v0 - 1, v1], :, :].real
-        p = uvpsf[[v0 - 1, v1], :, :].real
-        return 1.0 / n[p > -p.min()].std() ** 2
+        n_real = uv_noise[[v0 - 1, v1], :, 1:-1].real
+        n_imag = uv_noise[[v0 - 1, v1], :, 1:-1].imag
+        p = uvpsf[[v0 - 1, v1], :, 1:-1].real
+        n = np.concatenate((n_real[p > -p.min()], n_imag[p > -p.min()]))
+        return 1.0 / n.std() ** 2
 
 
 class Cube(object):
@@ -891,6 +895,7 @@ class Cube(object):
         Examples:
             >>> noise = cube.create_noise(rms, shape, func_convlution)
         '''
+        # noise = misc.irfft2(misc.create_uvnoise_standardgauss(size=shape, seed=seed))
         rng = default_rng(seed)
         noise = rng.standard_normal(size=shape)
         if convolve:
@@ -1223,7 +1228,7 @@ class DirtyBeam:
         '''
         kernel = self.original
         dim = len(image.shape)
-        if len(image.shape) == 2:
+        if dim == 2:
             if is_noise:
                 return misc.fftconvolve_noise(
                     image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
@@ -1232,7 +1237,7 @@ class DirtyBeam:
                 return misc.fftconvolve(
                     image[np.newaxis, :, :], kernel[[0], :, :], uvcoverage
                 )
-        elif len(image.shape) == 3:
+        elif dim == 3:
             if is_noise:
                 return misc.fftconvolve_noise(image, kernel, uvcoverage)
             else:
