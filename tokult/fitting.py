@@ -49,7 +49,7 @@ yslice: slice
 lensing: Callable = misc.no_lensing
 lensing_interpolation: Callable = misc.no_lensing_interpolation
 convolve: Callable = misc.no_convolve
-mask: Optional[np.ndarray] = None
+mask: np.ndarray
 # mask_FoV: np.ndarray
 
 # To fix parameters in fitting
@@ -76,13 +76,15 @@ def least_square(
 ) -> Solution:
     '''Least square fitting using scipy.optimize.least_squares
     '''
+    if mask_for_fit is None:
+        mask_for_fit = np.ones_like(datacube.imageplane).astype(bool)
     if mode_fit == 'image':
         initialize_globalparameters_for_image(
             datacube,
+            mask_for_fit,
             func_convolve,
             func_lensing,
             func_create_lensinginterp,
-            mask_for_fit,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -90,13 +92,16 @@ def least_square(
             raise ValueError('"beam_vis" is necessary for uvfit')
         if norm_weight is None:
             raise ValueError('Param "norm_weight" is necessary for uvfit.')
+        if mask_for_fit is None:
+            mask_for_fit = np.ones_like(datacube.uvplane).astype(bool)
+
         initialize_globalparameters_for_uv(
             datacube,
             beam_vis,
             norm_weight,
+            mask_for_fit,
             func_lensing,
             func_create_lensinginterp,
-            mask_for_fit,
         )
         func_fit = construct_uvmodel
     else:
@@ -135,8 +140,10 @@ def montecarlo(
 ) -> Solution:
     '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares
     '''
+    if mask_for_fit is None:
+        mask_for_fit = np.ones_like(datacube.imageplane).astype(bool)
     initialize_globalparameters_for_image(
-        datacube, func_convolve, func_lensing, func_create_lensinginterp, mask_for_fit
+        datacube, mask_for_fit, func_convolve, func_lensing, func_create_lensinginterp
     )
     func_fit = construct_convolvedmodel
 
@@ -186,12 +193,14 @@ def mcmc(
     rng = default_rng(222)
 
     if mode_fit == 'image':
+        if mask_for_fit is None:
+            mask_for_fit = np.ones_like(datacube.imageplane).astype(bool)
         initialize_globalparameters_for_image(
             datacube,
+            mask_for_fit,
             func_convolve,
             func_lensing,
             func_create_lensinginterp,
-            mask_for_fit,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -199,13 +208,16 @@ def mcmc(
             raise ValueError('Parameter "beam_vis" is necessary for uvfit.')
         if norm_weight is None:
             raise ValueError('Parameter "norm_weight" is necessary for uvfit.')
+        if mask_for_fit is None:
+            mask_for_fit = np.ones_like(datacube.uvplane).astype(bool)
+
         initialize_globalparameters_for_uv(
             datacube,
             beam_vis,
             norm_weight,
+            mask_for_fit,
             func_lensing,
             func_create_lensinginterp,
-            mask_for_fit,
         )
         func_fit = construct_uvmodel
     else:
@@ -506,7 +518,7 @@ class Solution:
         try:
             tau = sampler.get_autocorr_time()
             burnin = int(np.max(tau) * 2.0)
-            thin = int(np.min(tau) * 2.0)
+            thin = int(np.min(tau) / 2.0)
         except emcee.autocorr.AutocorrError:
             c.logger.warning(
                 'MCMC may not be converged.'
@@ -857,11 +869,11 @@ def is_init_outside_of_bound(
 
 def initialize_globalparameters_for_image(
     datacube: DataCube,
+    mask_for_fit: np.ndarray,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
     beam_vis: Optional[np.ndarray] = None,
-    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the image plane.
     '''
@@ -872,15 +884,13 @@ def initialize_globalparameters_for_image(
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
     mask = mask_for_fit
-    if mask_for_fit is not None:
-        print(np.any(mask_for_fit))
-        if not np.any(mask_for_fit):
-            raise ValueError(
-                '"mask_for_fit" filled by False. We believe that you don\'t want to use it.'
-            )
-        cube = cube[mask]
-        cube_error = np.broadcast_to(cube_error, cube.shape)
-        cube_error = cube_error[mask]
+    if not np.any(mask_for_fit):
+        raise ValueError(
+            '"mask_for_fit" filled by False. We believe that you don\'t want to use it.'
+        )
+    cube_error = np.broadcast_to(cube_error, cube.shape)
+    cube = cube[mask]
+    cube_error = cube_error[mask]
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
@@ -905,9 +915,9 @@ def initialize_globalparameters_for_uv(
     datacube: DataCube,
     beam_vis: np.ndarray,
     norm_weight: float,
+    mask_for_fit: np.ndarray,
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
-    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
@@ -916,7 +926,8 @@ def initialize_globalparameters_for_uv(
 
     size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis / size
-    cube_error = 1 / np.sqrt(abs(beam_vis.real) * norm_weight) / size
+    cube_error = np.sqrt(abs(beam_vis.real)) / beam_vis / np.sqrt(norm_weight) / size
+    cube_error = _correct_cube_error_for_uv(cube_error)
     cubeshape = datacube.original[datacube.vslice, :, :].shape
     # sigma = (cube / cube_error).real
     # mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
@@ -924,11 +935,13 @@ def initialize_globalparameters_for_uv(
     #     mask = mask_for_fit & mask_to_remove_outlier
     # else:
     #     mask = mask_to_remove_outlier
+
     mask = mask_for_fit
     if not np.any(mask):
         raise ValueError(
             'We believe that you don\'t want to use "mask_for_fit" filled by False.'
         )
+    mask = _add_mask_for_uv(mask)
     cube_error = np.broadcast_to(cube_error, cube.shape)
     cube = cube[mask]
     cube_error = cube_error[mask]
@@ -956,6 +969,41 @@ def initialize_globalparameters_for_uv(
         lensing_interpolation = func_create_lensinginterp(xx_grid_image, yy_grid_image)
     else:
         lensing_interpolation = misc.no_lensing_interpolation
+
+
+def _correct_cube_error_for_uv(cube_error: np.ndarray) -> np.ndarray:
+    '''Correct the cube error used in the uv-plane.
+
+    On the uv-pane, the cube error is computed from the beam pattern.
+    However, some pixels have sqrt(2) times larger errors and no imaginary parts
+    becuase of characteristics of rfft, the Fourier transform of the real image.
+    This function applys the correction of sqrt(2) to specific pixels.
+    '''
+    if cube_error.ndim == 3:
+        _cube_error = np.copy(cube_error)
+        shape = cube_error.shape
+        idx_nyquist = shape[1] // 2
+        i = ([0, 0, idx_nyquist, idx_nyquist], [0, -1, 0, -1])
+        _cube_error[:, i[0], i[1]] *= np.sqrt(2)
+        return _cube_error
+
+    raise IndexError(f'Dimension of cube_error should be 3, but is {cube_error.ndim}.')
+
+
+def _add_mask_for_uv(mask: np.ndarray) -> np.ndarray:
+    '''Add the mask used for the uv-plane fitting.
+
+    As similar to _correct_cube_error_for_uv, this function masks
+    specific pixels that include redundant information because of
+    characteristics of rfft.
+    '''
+    if mask.ndim == 3:
+        shape = mask.shape
+        idx_nyquist = shape[1] // 2
+        mask[:, 1:idx_nyquist, [0, -1]] = False
+        return mask
+
+    raise IndexError(f'Dimension of mask should be 3, but is {mask.ndim}.')
 
 
 class FixParams(NamedTuple):
@@ -1111,13 +1159,15 @@ def least_square_moment0(
 
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
+    if mask_use is None:
+        mask_use = np.ones_like(datacube.moment0()).astype(bool)
     initialize_globalparameters_for_moment(
         datacube,
+        mask_use,
         func_convolve,
         func_lensing,
         func_create_lensinginterp,
         mom=0,
-        mask_for_fit=mask_use,
     )
     func_fit = construct_model_moment0
 
@@ -1149,12 +1199,7 @@ def least_square_moment1(
     mask = np.isfinite(moment1)
 
     initialize_globalparameters_for_moment(
-        datacube,
-        func_convolve,
-        func_lensing,
-        func_create_lensinginterp,
-        mom=1,
-        mask_for_fit=mask,
+        datacube, mask, func_convolve, func_lensing, func_create_lensinginterp, mom=1,
     )
     func_fit = construct_model_moment1
 
@@ -1170,13 +1215,14 @@ def least_square_moment1(
 
 def initialize_globalparameters_for_moment(
     datacube: DataCube,
+    mask_for_fit: np.ndarray,
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
     mom: int = 0,
-    mask_for_fit: Optional[np.ndarray] = None,
 ) -> None:
-    '''Set global parameters used in fitting.py.'''
+    '''Set global parameters used in fitting.py.
+    '''
     global cube, cube_error, xx_grid, yy_grid
     global lensing, lensing_interpolation, convolve, mask
 
@@ -1209,7 +1255,8 @@ def initialize_globalparameters_for_moment(
 
 
 def map_globals_to_childprocesses(pool: Pool) -> None:
-    '''Map parent global parameters to global parameters worked in pooled child processes.'''
+    '''Map parent global parameters to parameters in pooled child processes.
+    '''
     keys_globals = [
         'cube',
         'cube_error',

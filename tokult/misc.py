@@ -1,7 +1,7 @@
 '''miscellaneous functions
 '''
 import numpy as np
-from scipy.signal import fftconvolve as sp_fftconvolve
+from numpy.random import default_rng
 from astropy import units as u
 import astropy.constants as const
 from typing import Optional, Union
@@ -130,6 +130,17 @@ def fftconvolve_noise(
         uv_noise[np.logical_not(uvcoverage)] = 0.0
 
     return irfft2(uv_noise)
+
+
+def create_uvnoise_standardgauss(
+    size: tuple[int, ...], seed: Optional[int] = None
+) -> np.ndarray:
+    '''Create a Gauss noise in the frequency domain.
+    '''
+    rng = default_rng(seed)
+    noise_real = rng.standard_normal(size=size)
+    noise_imag = rng.standard_normal(size=size)
+    return noise_real + noise_imag * 1j
 
 
 # def no_lensing(coordinate: np.ndarray) -> np.ndarray:

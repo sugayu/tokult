@@ -1,4 +1,6 @@
 *.last
 /tokult/__pycache__/
 /tokult/*.fits
+/test/__pycache__/
 docs_src/obipy-resources/
+*egg-info/
