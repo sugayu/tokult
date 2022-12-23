@@ -1160,7 +1160,7 @@ def least_square_moment0(
     This function is mainly for guessing initial parameters formain fitting routine.
     '''
     if mask_use is None:
-        mask_use = np.ones_like(datacube.moment0()).astype(bool)
+        mask_use = np.ones_like(datacube.moment0()).astype(bool)[None, :, :]
     initialize_globalparameters_for_moment(
         datacube,
         mask_use,
@@ -1226,13 +1226,14 @@ def initialize_globalparameters_for_moment(
     global cube, cube_error, xx_grid, yy_grid
     global lensing, lensing_interpolation, convolve, mask
 
+    mask = mask_for_fit
     if mom == 0:
-        cube = datacube.moment0()
+        cube = datacube.moment0()[mask.squeeze()]
         cube_error = np.array(datacube.rms_moment0())
     elif mom == 1:
         rms = datacube.rms_moment0()
         cube = datacube.pixmoment1(thresh=3 * rms)
-        idx = np.isfinite(cube)
+        idx = np.isfinite(cube) & mask.squeeze()
         cube = cube[idx]  # cube becomes 1d
         mom0 = datacube.moment0()[idx]
         cube_error = 1 / np.sqrt(mom0)
@@ -1240,7 +1241,6 @@ def initialize_globalparameters_for_moment(
     xx_grid = xx_grid_image[0, :, :]
     yy_grid = yy_grid_image[0, :, :]
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
-    mask = mask_for_fit
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
