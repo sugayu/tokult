@@ -541,7 +541,7 @@ class Tokult:
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
         uvpsf = misc.rfft2(self.dirtybeam.original)
-        uv_noise = uv / uvpsf * np.sqrt(abs(uvpsf.real))
+        uv_noise = uv / np.sqrt(abs(uvpsf.real))
 
         # Noise computed from side channels of (v0-1, v1)
         # Pixels where xlim=(1:-1) should be gaussian noise both in real and imag parts.
