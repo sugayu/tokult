@@ -157,8 +157,8 @@ def montecarlo(
     params_mc = np.empty((nperturb, len(_init)))
     for j in tqdm.tqdm(range(nperturb), leave=None, disable=(not progressbar)):
         _init_j = _init
-        global cube
-        cube = datacube.perturbed(convolve=func_fullconvolve)
+        global cube, mask
+        cube = datacube.perturbed(convolve=func_fullconvolve)[mask]
         for _ in range(niter):
             output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
             _init_j = output.x
