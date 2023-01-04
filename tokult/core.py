@@ -818,6 +818,7 @@ class Cube(object):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ):
         '''Create a noisy mock data cube.
 
@@ -838,7 +839,9 @@ class Cube(object):
             uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane. The
                 pixels with False are set to 0.0. Defaults to None.
         '''
-        noise = self.create_noise(rms, self.original.shape, convolve, seed, uvcoverage)
+        noise = self.create_noise(
+            rms, self.original.shape, convolve, seed, uvcoverage, rms_of_standardnoise
+        )
         mock = self.original + noise
         if not is_originalsize:
             mock = mock[self.vslice, self.yslice, self.xslice]
@@ -877,6 +880,7 @@ class Cube(object):
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         '''Create a noise cube.
 
@@ -900,9 +904,47 @@ class Cube(object):
         noise = rng.standard_normal(size=shape)
         if convolve:
             noise = convolve(noise, uvcoverage=uvcoverage, is_noise=True)
-        rms_computed = misc.rms(noise)
-        noise *= rms / rms_computed
+        if rms_of_standardnoise is None:
+            rms_of_standardnoise = np.asarray(misc.rms(noise, axis=(1, 2)))
+            rms_of_standardnoise = rms_of_standardnoise[..., np.newaxis, np.newaxis]
+        assert rms_of_standardnoise is not None
+        noise *= rms / rms_of_standardnoise
         return noise
+
+    @staticmethod
+    def _estimate_rms_of_standardnoise(
+        shape: tuple[int, ...],
+        convolve: Optional[Callable] = None,
+        uvcoverage: Optional[np.ndarray] = None,
+    ):
+        '''Estimate rms of mock noises after considering uvcoverage. 
+
+        This function is for perturbation of a datacube.
+        Although the create_noise() generates noises based on the standard normal
+        distribution, which has the rms of 1.0, the rms changes after taking the
+        uvcoverage into accound. This function estimate the rms value that can
+        be used to generate noises in Monte Carlo simulations.
+        Note: Without the rms returned by this function, the create_noise()
+        generates the noise with the rms that is exactly the same as the input value.
+
+        Args:
+            shape (tuple[int, ...]): Shape of the cube.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+        '''
+        Niter = 100
+        rng = default_rng()
+        array_noise = np.empty((Niter, shape[0]))
+
+        for i in range(Niter):
+            noise = rng.standard_normal(shape)
+            if convolve:
+                noise = convolve(noise, uvcoverage=uvcoverage, is_noise=True)
+            array_noise[i, :] = np.asarray(misc.rms(noise, axis=(1, 2)))
+        return array_noise.mean(axis=0)[..., np.newaxis, np.newaxis]
 
 
 class DataCube(Cube):
@@ -914,6 +956,7 @@ class DataCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         '''Perturb the data cube with the same noise level and return it.
 
@@ -938,7 +981,9 @@ class DataCube(Cube):
         '''
         rms = self.rms(is_originalsize=True)
         rms = rms[..., np.newaxis, np.newaxis]
-        return self.noisy(rms, convolve, seed, is_originalsize, uvcoverage)
+        return self.noisy(
+            rms, convolve, seed, is_originalsize, uvcoverage, rms_of_standardnoise
+        )
 
     @classmethod
     def create(

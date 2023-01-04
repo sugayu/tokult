@@ -155,10 +155,15 @@ def montecarlo(
     args = (func_fit,)
 
     params_mc = np.empty((nperturb, len(_init)))
+    rms_of_standardnoise = datacube._estimate_rms_of_standardnoise(
+        shape=datacube.original.shape, convolve=func_fullconvolve
+    )
     for j in tqdm.tqdm(range(nperturb), leave=None, disable=(not progressbar)):
         _init_j = _init
         global cube, mask
-        cube = datacube.perturbed(convolve=func_fullconvolve)[mask]
+        cube = datacube.perturbed(
+            convolve=func_fullconvolve, rms_of_standardnoise=rms_of_standardnoise
+        )[mask]
         for _ in range(niter):
             output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
             _init_j = output.x
