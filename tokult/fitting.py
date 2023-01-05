@@ -124,6 +124,7 @@ def least_square(
 
 
 def montecarlo(
+    config: c.ConfigParameters,
     datacube: DataCube,
     init: Sequence[float],
     bound: Optional[tuple[Sequence[float], Sequence[float]]] = None,
@@ -143,7 +144,12 @@ def montecarlo(
     if mask_for_fit is None:
         mask_for_fit = np.ones_like(datacube.imageplane).astype(bool)
     initialize_globalparameters_for_image(
-        datacube, mask_for_fit, func_convolve, func_lensing, func_create_lensinginterp
+        datacube,
+        mask_for_fit,
+        func_convolve,
+        func_lensing,
+        func_create_lensinginterp,
+        config.noisescale_factor,
     )
     func_fit = construct_convolvedmodel
 
@@ -161,13 +167,17 @@ def montecarlo(
     for j in tqdm.tqdm(range(nperturb), leave=None, disable=(not progressbar)):
         _init_j = _init
         global cube, mask
-        cube = datacube.perturbed(
+        cube_perturbed = datacube.perturbed(
             convolve=func_fullconvolve, rms_of_standardnoise=rms_of_standardnoise
-        )[mask]
+        )
+        cube = cube_perturbed[mask]
         for _ in range(niter):
             output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
             _init_j = output.x
         params_mc[j, :] = output.x
+
+        if config._debug_mode:
+            config._debug.mc_savecube(cube_perturbed, j)
 
     dof = datacube.imageplane.size - 1 - len(_init)
     chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)
@@ -206,6 +216,7 @@ def mcmc(
             func_convolve,
             func_lensing,
             func_create_lensinginterp,
+            config.noisescale_factor,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -223,6 +234,7 @@ def mcmc(
             mask_for_fit,
             func_lensing,
             func_create_lensinginterp,
+            config.noisescale_factor,
         )
         func_fit = construct_uvmodel
     else:
@@ -878,7 +890,7 @@ def initialize_globalparameters_for_image(
     func_convolve: Optional[Callable] = None,
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
-    beam_vis: Optional[np.ndarray] = None,
+    noisescale_factor: float = 1.0,
 ) -> None:
     '''Set global parameters used in fitting.py in the image plane.
     '''
@@ -895,7 +907,7 @@ def initialize_globalparameters_for_image(
         )
     cube_error = np.broadcast_to(cube_error, cube.shape)
     cube = cube[mask]
-    cube_error = cube_error[mask]
+    cube_error = cube_error[mask] * noisescale_factor
 
     # HACK: necessarily for mypy bug(?) https://github.com/python/mypy/issues/10740
     f_no_convolve: Callable = misc.no_convolve
@@ -923,6 +935,7 @@ def initialize_globalparameters_for_uv(
     mask_for_fit: np.ndarray,
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
+    noisescale_factor: float = 1.0,
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
@@ -949,7 +962,7 @@ def initialize_globalparameters_for_uv(
     mask = _add_mask_for_uv(mask)
     cube_error = np.broadcast_to(cube_error, cube.shape)
     cube = cube[mask]
-    cube_error = cube_error[mask]
+    cube_error = cube_error[mask] * noisescale_factor
     # shape_data = datacube.uvplane.shape
     # xarray = np.arange(0, shape_data[2])
     # yarray = np.arange(0, shape_data[1])

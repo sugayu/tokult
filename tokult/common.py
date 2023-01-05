@@ -9,6 +9,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 import astropy.constants as astroconst
 import astropy.units as u
+from astropy.io import fits
 from emcee.moves import DEMove, DESnookerMove
 import logging
 from logging.config import dictConfig
@@ -19,6 +20,18 @@ __all__: list = []
 
 ##
 @dataclass
+class DebugParameters:
+    mc_dname_savecube = './'
+    mc_tag_savecube = 'mc'
+
+    def mc_savecube(self, cube: np.ndarray, i: int):
+        '''Save cubes created in Monte Carlo steps.
+        '''
+        fsave = self.mc_tag_savecube + f'{i:06d}.fits'
+        fits.writeto(self.mc_dname_savecube + fsave, cube, overwrite=True)
+
+
+@dataclass
 class ConfigParameters:
     '''Configulation containing hyper parameters.
     '''
@@ -27,6 +40,9 @@ class ConfigParameters:
     mcmc_moves: list = field(
         default_factory=lambda: [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
     )
+    noisescale_factor: float = 1.0
+    _debug_mode: bool = False
+    _debug: DebugParameters = field(default_factory=DebugParameters)
 
 
 @dataclass(frozen=True)

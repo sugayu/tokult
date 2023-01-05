@@ -209,6 +209,7 @@ class Tokult:
         elif optimization == 'mc':
             func_fullconvolve = self.dirtybeam.fullconvolve if self.dirtybeam else None
             solution = fitting.montecarlo(
+                self.config,
                 self.datacube,
                 init,
                 bound,
