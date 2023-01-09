@@ -41,6 +41,7 @@ lensing: a function to convert source plane to image plane. Method of GravLens.
 cube: np.ndarray
 cube_error: np.ndarray
 cubeshape: tuple[int, ...]
+cubeshape_imageplane: tuple[int, ...]
 xx_grid: np.ndarray
 yy_grid: np.ndarray
 vv_grid: np.ndarray
@@ -150,6 +151,7 @@ def montecarlo(
         func_lensing,
         func_create_lensinginterp,
         config.noisescale_factor,
+        config.pixel_upsampling_rate,
     )
     func_fit = construct_convolvedmodel
 
@@ -217,6 +219,7 @@ def mcmc(
             func_lensing,
             func_create_lensinginterp,
             config.noisescale_factor,
+            config.pixel_upsampling_rate,
         )
         func_fit = construct_convolvedmodel
     elif mode_fit == 'uv':
@@ -235,6 +238,7 @@ def mcmc(
             func_lensing,
             func_create_lensinginterp,
             config.noisescale_factor,
+            config.pixel_upsampling_rate,
         )
         func_fit = construct_uvmodel
     else:
@@ -345,7 +349,7 @@ def construct_uvmodel(params: tuple[float, ...]) -> np.ndarray:
 def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
     '''Construct a model detacube on image plane using parameters and the grav. lensing.
     '''
-    global xx_grid, yy_grid, vv_grid
+    global xx_grid, yy_grid, vv_grid, cubeshape_imageplane
     _params = restore_params(params)
     p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13 = _params
 
@@ -363,6 +367,7 @@ def construct_model_at_imageplane(params: tuple[float, ...]) -> np.ndarray:
 
     # create cube
     model = func.gaussian(vv_grid, center=velocity, sigma=p8, area=intensity)
+    model = misc.down_sampling(model, cubeshape_imageplane)
     return model
 
 
@@ -399,12 +404,21 @@ def construct_model_at_imageplane_with(
     vv_grid_image: np.ndarray,
     lensing: Optional[Callable] = None,
     create_interpolate_lensing: Optional[Callable] = None,
+    upsampling_rate: tuple[int, ...] = (1, 1, 1),
 ) -> np.ndarray:
     '''Construct a model detacube convolved with dirtybeam.
     '''
     lensing = lensing if lensing else misc.no_lensing
-    xx_grid, yy_grid = lensing(xx_grid_image[[0], :, :], yy_grid_image[[0], :, :])
-    vv_grid = vv_grid_image
+    vv_grid = misc.gridding_upsample(vv_grid_image[:, 0, 0], upsampling_rate[0])
+    vv_grid = vv_grid.reshape(-1, 1, 1)
+    if (upsampling_rate[1] > 1) or (upsampling_rate[2] > 1):
+        c.logger.warning(
+            'Up-sampling in x and y has not yet been implemented. '
+            'It performs fitting without up-sampling in x and y.'
+        )
+    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
+    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
+    xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     lensing_interpolation = (
         create_interpolate_lensing(xx_grid_image, yy_grid_image)
         if create_interpolate_lensing
@@ -891,15 +905,17 @@ def initialize_globalparameters_for_image(
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
     noisescale_factor: float = 1.0,
+    upsampling_rate: tuple[int, int, int] = (1, 1, 1),
 ) -> None:
     '''Set global parameters used in fitting.py in the image plane.
     '''
-    global cube, cube_error, xx_grid, yy_grid, vv_grid
+    global cube, cube_error, xx_grid, yy_grid, vv_grid, cubeshape_imageplane
     global lensing, lensing_interpolation, convolve, mask
 
     cube = np.copy(datacube.imageplane)
     cube_error = datacube.rms()
     cube_error = cube_error[:, np.newaxis, np.newaxis]
+    cubeshape_imageplane = cube.shape
     mask = mask_for_fit
     if not np.any(mask_for_fit):
         raise ValueError(
@@ -916,10 +932,16 @@ def initialize_globalparameters_for_image(
     lensing = func_lensing if func_lensing else f_no_lensing
 
     vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
-    yy_grid = yy_grid_image[[0], :, :]
-    xx_grid = xx_grid_image[[0], :, :]
+    vv_grid = misc.gridding_upsample(vv_grid[:, 0, 0], upsampling_rate[0])
+    vv_grid = vv_grid.reshape(-1, 1, 1)
+    if (upsampling_rate[1] > 1) | (upsampling_rate[2] > 1):
+        c.logger.warning(
+            'Up-sampling in x and y has not yet been implemented. '
+            'It performs fitting without up-sampling in x and y.'
+        )
+    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
+    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
-    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
 
     lensing_interpolation = (
         func_create_lensinginterp(xx_grid_image, yy_grid_image)
@@ -936,10 +958,12 @@ def initialize_globalparameters_for_uv(
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
     noisescale_factor: float = 1.0,
+    upsampling_rate: tuple[int, int, int] = (1, 1, 1),
 ) -> None:
     '''Set global parameters used in fitting.py in the uv plane.
     '''
-    global cube, cube_error, cubeshape, xx_grid, yy_grid, vv_grid, xslice, yslice
+    global cube, cube_error, cubeshape, cubeshape_imageplane
+    global xx_grid, yy_grid, vv_grid, xslice, yslice
     global lensing, lensing_interpolation, mask
 
     size = datacube.original[0, :, :].size  # constant var needed for convolution
@@ -947,6 +971,7 @@ def initialize_globalparameters_for_uv(
     cube_error = np.sqrt(abs(beam_vis.real)) / beam_vis / np.sqrt(norm_weight) / size
     cube_error = _correct_cube_error_for_uv(cube_error)
     cubeshape = datacube.original[datacube.vslice, :, :].shape
+    cubeshape_imageplane = datacube.imageplane.shape
     # sigma = (cube / cube_error).real
     # mask_to_remove_outlier = (sigma > -5) & (sigma < 5)
     # if mask_for_fit is not None:
@@ -974,10 +999,16 @@ def initialize_globalparameters_for_uv(
     lensing = func_lensing if func_lensing else f_no_lensing
 
     vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
-    yy_grid = yy_grid_image[[0], :, :]
-    xx_grid = xx_grid_image[[0], :, :]
+    vv_grid = misc.gridding_upsample(vv_grid[:, 0, 0], upsampling_rate[0])
+    vv_grid = vv_grid.reshape(-1, 1, 1)
+    if (upsampling_rate[1] > 1) | (upsampling_rate[2] > 1):
+        c.logger.warning(
+            'Up-sampling in x and y has not yet been implemented. '
+            'It performs fitting without up-sampling in x and y.'
+        )
+    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
+    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
-    vv_grid = vv_grid[:, 0, 0].reshape(-1, 1, 1)
     xslice, yslice = (datacube.xslice, datacube.yslice)
 
     # beam_visibility = beam_vis

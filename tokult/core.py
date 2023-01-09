@@ -528,6 +528,7 @@ class Tokult:
             convolve=func_convolve,
             lensing=func_lensing,
             create_interpolate_lensing=func_create_lensinginterp,
+            upsampling_rate=self.config.pixel_upsampling_rate,
         )
 
     def calculate_normweight(self) -> float:
@@ -1074,6 +1075,7 @@ class ModelCube(Cube):
         lensing: Optional[Callable] = None,
         convolve: Optional[Callable] = None,
         create_interpolate_lensing: Optional[Callable] = None,
+        upsampling_rate: tuple[int, ...] = (1, 1, 1),
     ) -> ModelCube:
         '''Constructer of ``ModelCube``.
 
@@ -1104,6 +1106,7 @@ class ModelCube(Cube):
             vv_grid_image=datacube.vgrid,
             lensing=lensing,
             create_interpolate_lensing=create_interpolate_lensing,
+            upsampling_rate=upsampling_rate,
         )
         modelcube = np.zeros_like(datacube.original)
         xs, ys, vs = datacube.xslice, datacube.yslice, datacube.vslice

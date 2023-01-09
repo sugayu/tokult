@@ -36,6 +36,7 @@ class ConfigParameters:
     '''Configulation containing hyper parameters.
     '''
 
+    pixel_upsampling_rate: tuple[int, int, int] = (1, 1, 1)
     mcmc_init_dispersion: float = 0.001
     mcmc_moves: list = field(
         default_factory=lambda: [(DEMove(), 0.8), (DESnookerMove(), 0.2)]

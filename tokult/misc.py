@@ -15,7 +15,7 @@ def rms(
     cube: np.ndarray, axis: Optional[tuple[int, ...]] = None
 ) -> Union[np.ndarray, float]:
     '''Compute r.m.s.'''
-    sumsq = np.nansum(cube**2, axis=axis)
+    sumsq = np.nansum(cube ** 2, axis=axis)
     cube_zerofill = np.copy(cube)
     cube_zerofill[~np.isfinite(cube)] = 0.0
     n = np.count_nonzero(cube_zerofill, axis=axis)
@@ -35,9 +35,45 @@ def rotate_coord(pos: np.ndarray, angle: float) -> np.ndarray:
 
 def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     '''Convert (x, y) to polar coordinates (r, phi)'''
-    r = np.sqrt(x**2 + y**2)
+    r = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
     return r, phi
+
+
+def down_sampling(cube: np.ndarray, shape_to: tuple[int, ...]) -> np.ndarray:
+    '''Down-sampling of a data cube.
+
+    This is to reconstruct the data cube more-finely-resampled when the sampling
+    rate is not sufficient.
+
+    Args:
+        cube (np.ndarray): 3d data cube.
+        shape_to (tuple[int, int, int]): Shape of the resampled cube.
+
+    Returns:
+        np.ndarray: Resampled data cube.
+    '''
+    shape_from = cube.shape
+    if shape_from == shape_to:
+        return cube
+    nbins = [f // t for f, t in zip(shape_from, shape_to)]
+    cube_out = cube.reshape(
+        shape_to[0], nbins[0], shape_to[1], nbins[1], shape_to[2], nbins[2]
+    )
+    return cube_out.mean(axis=(1, 3, 5))
+
+
+def gridding_upsample(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
+    '''Make grids up-sampling.
+
+    Args:
+        grid (np.ndarray):
+        rate_upsampling (int):
+    '''
+    if rate_upsampling == 1:
+        return grid
+    nbins_to = len(grid) * rate_upsampling
+    return np.linspace(grid[0] - 0.5, grid[-1] + 0.5, (nbins_to) * 2 + 1)[1:-1:2]
 
 
 def fft2(cube: np.ndarray) -> np.ndarray:
@@ -163,7 +199,7 @@ def pixel_scale(pixscale: u.Quantity, redshift: float = 0.0) -> u.Equivalency:
     '''Set pixel scale between pix and arcsec.'''
     pixelscale = u.pixel_scale(pixscale)
     Jy_asec2 = u.Jy / (1.0 * u.pix).to(u.arcsec, pixelscale) ** 2
-    pixelscale.extend([(u.Jy / u.pix**2, u.Unit(Jy_asec2))])
+    pixelscale.extend([(u.Jy / u.pix ** 2, u.Unit(Jy_asec2))])
 
     if redshift > 0.0:
         angdiameter = cosmo.angular_diameter_distance(redshift)
@@ -171,9 +207,9 @@ def pixel_scale(pixscale: u.Quantity, redshift: float = 0.0) -> u.Equivalency:
         pixelscale.extend(
             [
                 (u.rad, u.Unit(angdiameter)),
-                (u.Jy / u.rad**2, u.Unit(u.Jy / angdiameter**2)),
+                (u.Jy / u.rad ** 2, u.Unit(u.Jy / angdiameter ** 2)),
                 (u.pix, u.Unit(Mpc_per_pix)),
-                (u.Jy / u.pix**2, u.Unit(u.Jy / Mpc_per_pix**2)),
+                (u.Jy / u.pix ** 2, u.Unit(u.Jy / Mpc_per_pix ** 2)),
             ]
         )
     return pixelscale
@@ -191,5 +227,5 @@ def diskmass_scale(
     '''Set disk-mass scale between pix*v-pix**2 and m*km/s**2.'''
     m_pix = (1.0 * u.pix).to(u.m, pixelscale)
     kms_vpix = (1.0 * u.pix).to(u.km / u.s, vpixelscale)
-    diskmass = (1.0 * m_pix * kms_vpix**2 / const.G).decompose()
-    return u.Equivalency([(u.Unit(u.pix**3), u.Unit(diskmass))])
+    diskmass = (1.0 * m_pix * kms_vpix ** 2 / const.G).decompose()
+    return u.Equivalency([(u.Unit(u.pix ** 3), u.Unit(diskmass))])
