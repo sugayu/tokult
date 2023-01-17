@@ -25,16 +25,14 @@ class DebugParameters:
     mc_tag_savecube = 'mc'
 
     def mc_savecube(self, cube: np.ndarray, i: int):
-        '''Save cubes created in Monte Carlo steps.
-        '''
+        '''Save cubes created in Monte Carlo steps.'''
         fsave = self.mc_tag_savecube + f'{i:06d}.fits'
         fits.writeto(self.mc_dname_savecube + fsave, cube, overwrite=True)
 
 
 @dataclass
 class ConfigParameters:
-    '''Configulation containing hyper parameters.
-    '''
+    '''Configulation containing hyper parameters.'''
 
     pixel_upsampling_rate: tuple[int, int, int] = (1, 1, 1)
     mcmc_init_dispersion: float = 0.001
@@ -48,8 +46,7 @@ class ConfigParameters:
 
 @dataclass(frozen=True)
 class Config:
-    '''Configulation class containing constants.
-    '''
+    '''Configulation class containing constants.'''
 
     project: str
     fname_gamma1: Optional[str] = None
