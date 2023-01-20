@@ -129,6 +129,7 @@ class Tokult:
         pool: Optional[Pool] = None,
         is_separate: bool = False,
         mask_for_fit: Optional[np.ndarray] = None,
+        uvcoverage: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
         '''Fit a 3d model to the data cube on the image plane.
@@ -209,6 +210,7 @@ class Tokult:
         elif optimization == 'mc':
             func_fullconvolve = self.dirtybeam.fullconvolve if self.dirtybeam else None
             solution = fitting.montecarlo(
+                self.config,
                 self.datacube,
                 init,
                 bound,
@@ -221,6 +223,7 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                uvcoverage=uvcoverage,
                 progressbar=progressbar,
             )
         _redshift_tmp = self.gravlens.z_source if self.gravlens is not None else None
@@ -527,6 +530,7 @@ class Tokult:
             convolve=func_convolve,
             lensing=func_lensing,
             create_interpolate_lensing=func_create_lensinginterp,
+            upsampling_rate=self.config.pixel_upsampling_rate,
         )
 
     def calculate_normweight(self) -> float:
@@ -760,7 +764,7 @@ class Cube(object):
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
         vv = self.vgrid - mom1[np.newaxis, ...]
-        mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / mom0
+        mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / mom0
         mom2[mom0 <= thresh] = None
         return mom2
 
@@ -803,7 +807,7 @@ class Cube(object):
                     pass
             mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
-            self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
+            self.mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
             return self.mom2
 
@@ -818,6 +822,7 @@ class Cube(object):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ):
         '''Create a noisy mock data cube.
 
@@ -838,7 +843,9 @@ class Cube(object):
             uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane. The
                 pixels with False are set to 0.0. Defaults to None.
         '''
-        noise = self.create_noise(rms, self.original.shape, convolve, seed, uvcoverage)
+        noise = self.create_noise(
+            rms, self.original.shape, convolve, seed, uvcoverage, rms_of_standardnoise
+        )
         mock = self.original + noise
         if not is_originalsize:
             mock = mock[self.vslice, self.yslice, self.xslice]
@@ -877,6 +884,7 @@ class Cube(object):
         convolve: Optional[Callable] = None,
         seed: Optional[int] = None,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         '''Create a noise cube.
 
@@ -900,9 +908,47 @@ class Cube(object):
         noise = rng.standard_normal(size=shape)
         if convolve:
             noise = convolve(noise, uvcoverage=uvcoverage, is_noise=True)
-        rms_computed = misc.rms(noise)
-        noise *= rms / rms_computed
+        if rms_of_standardnoise is None:
+            rms_of_standardnoise = np.asarray(misc.rms(noise, axis=(1, 2)))
+            rms_of_standardnoise = rms_of_standardnoise[..., np.newaxis, np.newaxis]
+        assert rms_of_standardnoise is not None
+        noise *= rms / rms_of_standardnoise
         return noise
+
+    @staticmethod
+    def _estimate_rms_of_standardnoise(
+        shape: tuple[int, ...],
+        convolve: Optional[Callable] = None,
+        uvcoverage: Optional[np.ndarray] = None,
+    ):
+        '''Estimate rms of mock noises after considering uvcoverage.
+
+        This function is for perturbation of a datacube.
+        Although the create_noise() generates noises based on the standard normal
+        distribution, which has the rms of 1.0, the rms changes after taking the
+        uvcoverage into accound. This function estimate the rms value that can
+        be used to generate noises in Monte Carlo simulations.
+        Note: Without the rms returned by this function, the create_noise()
+        generates the noise with the rms that is exactly the same as the input value.
+
+        Args:
+            shape (tuple[int, ...]): Shape of the cube.
+            convolve (Optional[Callable], optional): Convolution function.
+                Defaults to None.
+            seed (Optional[int], optional): Random seed. Defaults to None.
+            uvcoverage (Optional[np.ndarray], optional): Mask on the uv plane.
+                Defaults to None.
+        '''
+        Niter = 100
+        rng = default_rng()
+        array_noise = np.empty((Niter, shape[0]))
+
+        for i in range(Niter):
+            noise = rng.standard_normal(shape)
+            if convolve:
+                noise = convolve(noise, uvcoverage=uvcoverage, is_noise=True)
+            array_noise[i, :] = np.asarray(misc.rms(noise, axis=(1, 2)))
+        return array_noise.mean(axis=0)[..., np.newaxis, np.newaxis]
 
 
 class DataCube(Cube):
@@ -914,6 +960,7 @@ class DataCube(Cube):
         seed: Optional[int] = None,
         is_originalsize: bool = False,
         uvcoverage: Optional[np.ndarray] = None,
+        rms_of_standardnoise: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         '''Perturb the data cube with the same noise level and return it.
 
@@ -938,7 +985,9 @@ class DataCube(Cube):
         '''
         rms = self.rms(is_originalsize=True)
         rms = rms[..., np.newaxis, np.newaxis]
-        return self.noisy(rms, convolve, seed, is_originalsize, uvcoverage)
+        return self.noisy(
+            rms, convolve, seed, is_originalsize, uvcoverage, rms_of_standardnoise
+        )
 
     @classmethod
     def create(
@@ -1028,6 +1077,7 @@ class ModelCube(Cube):
         lensing: Optional[Callable] = None,
         convolve: Optional[Callable] = None,
         create_interpolate_lensing: Optional[Callable] = None,
+        upsampling_rate: tuple[int, ...] = (1, 1, 1),
     ) -> ModelCube:
         '''Constructer of ``ModelCube``.
 
@@ -1058,6 +1108,7 @@ class ModelCube(Cube):
             vv_grid_image=datacube.vgrid,
             lensing=lensing,
             create_interpolate_lensing=create_interpolate_lensing,
+            upsampling_rate=upsampling_rate,
         )
         modelcube = np.zeros_like(datacube.original)
         xs, ys, vs = datacube.xslice, datacube.yslice, datacube.vslice
@@ -1122,7 +1173,7 @@ class DirtyBeam:
     Contained data is dirtybeam images as a function of frequency.
     '''
 
-    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
+    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None) -> None:
         self.original = beam
         self.imageplane = beam
         self.header = header
@@ -1568,7 +1619,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1591,8 +1642,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.
-        '''
+        '''Reset the redshift infomation.'''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1600,8 +1650,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def compute_deflection_angles(self):
-        '''Compute deflection angles in arcsec and pixels using redshifts
-        '''
+        '''Compute deflection angles in arcsec and pixels using redshifts'''
         # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
@@ -1730,7 +1779,7 @@ class GravLens:
 
     @staticmethod
     def loadfits(
-        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0,
+        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0
     ) -> tuple[np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 
@@ -1924,7 +1973,7 @@ class GravLensOld:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1966,7 +2015,7 @@ class GravLensOld:
         Returns:
             np.ndarray: Magnification map.
         '''
-        gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
+        gamma2 = self.gamma1**2 + self.gamma2**2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
@@ -2005,7 +2054,7 @@ class GravLensOld:
 
     @staticmethod
     def loadfits(
-        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
+        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 

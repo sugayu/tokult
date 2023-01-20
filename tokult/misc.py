@@ -14,10 +14,11 @@ __all__: list = []
 def rms(
     cube: np.ndarray, axis: Optional[tuple[int, ...]] = None
 ) -> Union[np.ndarray, float]:
-    '''Compute r.m.s.
-    '''
+    '''Compute r.m.s.'''
     sumsq = np.nansum(cube ** 2, axis=axis)
-    n = np.count_nonzero(cube, axis=axis)
+    cube_zerofill = np.copy(cube)
+    cube_zerofill[~np.isfinite(cube)] = 0.0
+    n = np.count_nonzero(cube_zerofill, axis=axis)
     return np.sqrt(sumsq / n)
 
 
@@ -33,16 +34,50 @@ def rotate_coord(pos: np.ndarray, angle: float) -> np.ndarray:
 
 
 def polar_coord(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    '''Convert (x, y) to polar coordinates (r, phi)
-    '''
+    '''Convert (x, y) to polar coordinates (r, phi)'''
     r = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
     return r, phi
 
 
-def fft2(cube: np.ndarray) -> np.ndarray:
-    '''2 dimensional Fourier transform.
+def down_sampling(cube: np.ndarray, shape_to: tuple[int, ...]) -> np.ndarray:
+    '''Down-sampling of a data cube.
+
+    This is to reconstruct the data cube more-finely-resampled when the sampling
+    rate is not sufficient.
+
+    Args:
+        cube (np.ndarray): 3d data cube.
+        shape_to (tuple[int, int, int]): Shape of the resampled cube.
+
+    Returns:
+        np.ndarray: Resampled data cube.
     '''
+    shape_from = cube.shape
+    if shape_from == shape_to:
+        return cube
+    nbins = [f // t for f, t in zip(shape_from, shape_to)]
+    cube_out = cube.reshape(
+        shape_to[0], nbins[0], shape_to[1], nbins[1], shape_to[2], nbins[2]
+    )
+    return cube_out.mean(axis=(1, 3, 5))
+
+
+def gridding_upsample(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
+    '''Make grids up-sampling.
+
+    Args:
+        grid (np.ndarray):
+        rate_upsampling (int):
+    '''
+    if rate_upsampling == 1:
+        return grid
+    nbins_to = len(grid) * rate_upsampling
+    return np.linspace(grid[0] - 0.5, grid[-1] + 0.5, (nbins_to) * 2 + 1)[1:-1:2]
+
+
+def fft2(cube: np.ndarray) -> np.ndarray:
+    '''2 dimensional Fourier transform.'''
     # shift = (np.array(cube.shape[1:]) / 2.0).astype(int)
     # cube_shift = np.roll(cube, shift, axis=(1, 2))
     cube_shift = np.fft.ifftshift(cube, axes=(1, 2))
@@ -52,8 +87,7 @@ def fft2(cube: np.ndarray) -> np.ndarray:
 
 
 def ifft2(uvcube: np.ndarray) -> np.ndarray:
-    '''Inverse 2 dimensional Fourier transform.
-    '''
+    '''Inverse 2 dimensional Fourier transform.'''
     cube_shift = np.fft.ifftshift(uvcube, axes=(1, 2))
     cube_shift = np.fft.ifft2(cube_shift, norm='forward')
     cube = np.fft.fftshift(cube_shift, axes=(1, 2))
@@ -63,8 +97,7 @@ def ifft2(uvcube: np.ndarray) -> np.ndarray:
 
 
 def rfft2(cube: np.ndarray) -> np.ndarray:
-    '''2 dimensional real Fourier transform.
-    '''
+    '''2 dimensional real Fourier transform.'''
     cube_shift = np.fft.ifftshift(cube, axes=(1, 2))
     uvcube = np.fft.rfft2(cube_shift, norm='forward')
     uvcube = np.fft.fftshift(uvcube, axes=1)
@@ -72,8 +105,7 @@ def rfft2(cube: np.ndarray) -> np.ndarray:
 
 
 def irfft2(uvcube: np.ndarray) -> np.ndarray:
-    '''Inverse 2 dimensional real Fourier transform.
-    '''
+    '''Inverse 2 dimensional real Fourier transform.'''
     cube_shift = np.fft.ifftshift(uvcube, axes=1)
     cube_shift = np.fft.irfft2(cube_shift, norm='forward')
     cube = np.fft.fftshift(cube_shift, axes=(1, 2))
@@ -135,8 +167,7 @@ def fftconvolve_noise(
 def create_uvnoise_standardgauss(
     size: tuple[int, ...], seed: Optional[int] = None
 ) -> np.ndarray:
-    '''Create a Gauss noise in the frequency domain.
-    '''
+    '''Create a Gauss noise in the frequency domain.'''
     rng = default_rng(seed)
     noise_real = rng.standard_normal(size=size)
     noise_imag = rng.standard_normal(size=size)
@@ -150,26 +181,22 @@ def create_uvnoise_standardgauss(
 
 
 def no_lensing(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, ...]:
-    '''Dummy function. Return coordinate as itself without lensing.
-    '''
+    '''Dummy function. Return coordinate as itself without lensing.'''
     return (x, y)
 
 
 def no_lensing_interpolation(x: float, y: float) -> np.ndarray:
-    '''Dummy function. Return coordinate as itself without lensing.
-    '''
+    '''Dummy function. Return coordinate as itself without lensing.'''
     return np.array([x, y])
 
 
 def no_convolve(datacube: np.ndarray, index: int = 0) -> np.ndarray:
-    '''Dummy function. Return the datacube as itself without convolution.
-    '''
+    '''Dummy function. Return the datacube as itself without convolution.'''
     return datacube
 
 
 def pixel_scale(pixscale: u.Quantity, redshift: float = 0.0) -> u.Equivalency:
-    '''Set pixel scale between pix and arcsec.
-    '''
+    '''Set pixel scale between pix and arcsec.'''
     pixelscale = u.pixel_scale(pixscale)
     Jy_asec2 = u.Jy / (1.0 * u.pix).to(u.arcsec, pixelscale) ** 2
     pixelscale.extend([(u.Jy / u.pix ** 2, u.Unit(Jy_asec2))])
@@ -189,8 +216,7 @@ def pixel_scale(pixscale: u.Quantity, redshift: float = 0.0) -> u.Equivalency:
 
 
 def vpixel_scale(vpixscale: u.Quantity) -> u.Equivalency:
-    '''Set velocity-pixel scale between v-pix and km/s.
-    '''
+    '''Set velocity-pixel scale between v-pix and km/s.'''
     vpixelscale = u.pixel_scale(vpixscale)
     return vpixelscale
 
@@ -198,8 +224,7 @@ def vpixel_scale(vpixscale: u.Quantity) -> u.Equivalency:
 def diskmass_scale(
     pixelscale: u.Equivalency, vpixelscale: u.Equivalency
 ) -> u.Equivalency:
-    '''Set disk-mass scale between pix*v-pix**2 and m*km/s**2.
-    '''
+    '''Set disk-mass scale between pix*v-pix**2 and m*km/s**2.'''
     m_pix = (1.0 * u.pix).to(u.m, pixelscale)
     kms_vpix = (1.0 * u.pix).to(u.km / u.s, vpixelscale)
     diskmass = (1.0 * m_pix * kms_vpix ** 2 / const.G).decompose()
