@@ -134,14 +134,17 @@ def montecarlo(
     func_lensing: Optional[Callable] = None,
     func_create_lensinginterp: Optional[Callable] = None,
     mask_for_fit: Optional[np.ndarray] = None,
+    uvcoverage: Optional[np.ndarray] = None,
     nperturb: int = 1000,
     niter: int = 1,
     is_separate: bool = False,
     progressbar: bool = False,
 ) -> Solution:
     '''Monte Carlo fitting to derive errors using scipy.optimize.least_squares'''
+
     if mask_for_fit is None:
         mask_for_fit = np.ones_like(datacube.imageplane).astype(bool)
+
     initialize_globalparameters_for_image(
         datacube,
         mask_for_fit,
@@ -167,17 +170,22 @@ def montecarlo(
     for j in tqdm.tqdm(range(nperturb), leave=None, disable=(not progressbar)):
         _init_j = _init
         global cube, mask
-        cube_perturbed = datacube.perturbed(
-            convolve=func_fullconvolve, rms_of_standardnoise=rms_of_standardnoise
+        noisycube_originalsize = datacube.perturbed(
+            convolve=func_fullconvolve,
+            rms_of_standardnoise=rms_of_standardnoise,
+            uvcoverage=uvcoverage,
+            is_originalsize=True,
         )
-        cube = cube_perturbed[mask]
+        noisycube = noisycube_originalsize[
+            datacube.vslice, datacube.yslice, datacube.xslice
+        ]
+        cube = noisycube[mask]
         for _ in range(niter):
             output = sp_least_squares(calculate_chi, _init_j, args=args, bounds=_bound)
             _init_j = output.x
         params_mc[j, :] = output.x
 
-        if config._debug_mode:
-            config._debug.mc_savecube(cube_perturbed, j)
+        config._debug.mc_savecube(noisycube, noisycube_originalsize, j)
 
     dof = datacube.imageplane.size - 1 - len(_init)
     chi2 = np.sum(calculate_chi(output.x, func_fit) ** 2.0)

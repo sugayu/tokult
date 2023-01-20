@@ -129,6 +129,7 @@ class Tokult:
         pool: Optional[Pool] = None,
         is_separate: bool = False,
         mask_for_fit: Optional[np.ndarray] = None,
+        uvcoverage: Optional[np.ndarray] = None,
         progressbar: bool = False,
     ) -> fitting.Solution:
         '''Fit a 3d model to the data cube on the image plane.
@@ -222,6 +223,7 @@ class Tokult:
                 fix=fix,
                 is_separate=is_separate,
                 mask_for_fit=mask_for_fit,
+                uvcoverage=uvcoverage,
                 progressbar=progressbar,
             )
         _redshift_tmp = self.gravlens.z_source if self.gravlens is not None else None
@@ -762,7 +764,7 @@ class Cube(object):
         mom0 = self.moment0()
         mom1 = self.pixmoment1()
         vv = self.vgrid - mom1[np.newaxis, ...]
-        mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / mom0
+        mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / mom0
         mom2[mom0 <= thresh] = None
         return mom2
 
@@ -805,7 +807,7 @@ class Cube(object):
                     pass
             mom1 = self._get_pixmoments(imom=1)
             vv = self.vgrid - mom1[np.newaxis, ...]
-            self.mom2 = np.sum(self.imageplane * np.sqrt(vv ** 2), axis=0) / self.mom0
+            self.mom2 = np.sum(self.imageplane * np.sqrt(vv**2), axis=0) / self.mom0
             self.mom2[self.mom0 <= thresh] = None
             return self.mom2
 
@@ -919,7 +921,7 @@ class Cube(object):
         convolve: Optional[Callable] = None,
         uvcoverage: Optional[np.ndarray] = None,
     ):
-        '''Estimate rms of mock noises after considering uvcoverage. 
+        '''Estimate rms of mock noises after considering uvcoverage.
 
         This function is for perturbation of a datacube.
         Although the create_noise() generates noises based on the standard normal
@@ -1171,7 +1173,7 @@ class DirtyBeam:
     Contained data is dirtybeam images as a function of frequency.
     '''
 
-    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None,) -> None:
+    def __init__(self, beam: np.ndarray, header: Optional[fits.Header] = None) -> None:
         self.original = beam
         self.imageplane = beam
         self.header = header
@@ -1617,7 +1619,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -1640,8 +1642,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def reset_redshifts(self) -> None:
-        '''Reset the redshift infomation.
-        '''
+        '''Reset the redshift infomation.'''
         self.z_lens = None
         self.z_source = None
         self.z_assumed = None
@@ -1649,8 +1650,7 @@ class GravLens:
         self.compute_deflection_angles()
 
     def compute_deflection_angles(self):
-        '''Compute deflection angles in arcsec and pixels using redshifts
-        '''
+        '''Compute deflection angles in arcsec and pixels using redshifts'''
         # x_arcsec_raw = self.original_x_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         # y_arcsec_raw = self.original_y_arcsec_deflect[self.idx_wcs].reshape(*self.shape)
         x_arcsec_raw = self.interpolate_x_arcsec(self.yaxis, self.xaxis)
@@ -1779,7 +1779,7 @@ class GravLens:
 
     @staticmethod
     def loadfits(
-        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0,
+        fname_x_deflect: str, fname_y_deflect: str, index_hdul: int = 0
     ) -> tuple[np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 
@@ -1973,7 +1973,7 @@ class GravLensOld:
         self.jacob = self.get_jacob()
 
     def use_redshifts(
-        self, z_source: float, z_lens: float, z_assumed: float = np.inf,
+        self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
         '''Correct the lensing parameters using the redshifts.
 
@@ -2015,7 +2015,7 @@ class GravLensOld:
         Returns:
             np.ndarray: Magnification map.
         '''
-        gamma2 = self.gamma1 ** 2 + self.gamma2 ** 2
+        gamma2 = self.gamma1**2 + self.gamma2**2
         return 1 / ((1 - self.kappa) ** 2 - gamma2)
 
     @staticmethod
@@ -2054,7 +2054,7 @@ class GravLensOld:
 
     @staticmethod
     def loadfits(
-        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0,
+        fname_gamma1: str, fname_gamma2: str, fname_kappa: str, index_hdul: int = 0
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, fits.Header]:
         '''Read gravlens from fits file.
 

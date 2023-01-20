@@ -1,10 +1,11 @@
 '''Common utilities
 '''
 from __future__ import annotations
+from functools import wraps
 import os
 import pathlib
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 import astropy.constants as astroconst
@@ -19,15 +20,37 @@ __all__: list = []
 
 
 ##
+
+# Definition of a decorator
+def only_in_debug_mode(f: Callable) -> Callable:
+    '''Decorator to check whether debug_mode is turned on.'''
+
+    @wraps(f)
+    def _wrapper(self, *args):
+        if self.debug_mode:
+            return f(self, *args)
+
+    return _wrapper
+
+
 @dataclass
 class DebugParameters:
-    mc_dname_savecube = './'
-    mc_tag_savecube = 'mc'
+    debug_mode: bool = False
+    mc_dname_savecube: str = './'
+    mc_tag_savecube: str = 'mc'
 
-    def mc_savecube(self, cube: np.ndarray, i: int):
+    def turn_on(self) -> None:
+        self.debug_mode = True
+
+    def turn_off(self) -> None:
+        self.debug_mode = False
+
+    @only_in_debug_mode
+    def mc_savecube(self, cube: np.ndarray, cube_original: np.ndarray, i: int) -> None:
         '''Save cubes created in Monte Carlo steps.'''
         fsave = self.mc_tag_savecube + f'{i:06d}.fits'
         fits.writeto(self.mc_dname_savecube + fsave, cube, overwrite=True)
+        fits.append(self.mc_dname_savecube + fsave, cube_original)
 
 
 @dataclass
@@ -40,7 +63,6 @@ class ConfigParameters:
         default_factory=lambda: [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
     )
     noisescale_factor: float = 1.0
-    _debug_mode: bool = False
     _debug: DebugParameters = field(default_factory=DebugParameters)
 
 
