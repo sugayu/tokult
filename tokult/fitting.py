@@ -399,6 +399,7 @@ def construct_model_at_imageplane_with(
     xx_grid_image: np.ndarray,
     yy_grid_image: np.ndarray,
     vv_grid_image: np.ndarray,
+    cubeshape_imageplane: tuple[int, ...],
     lensing: Optional[Callable] = None,
     create_interpolate_lensing: Optional[Callable] = None,
     upsampling_rate: tuple[int, ...] = (1, 1, 1),
@@ -421,7 +422,14 @@ def construct_model_at_imageplane_with(
         else misc.no_lensing_interpolation
     )
 
-    keys_globals = ['xx_grid', 'yy_grid', 'vv_grid', 'lensing', 'lensing_interpolation']
+    keys_globals = [
+        'xx_grid',
+        'yy_grid',
+        'vv_grid',
+        'lensing',
+        'lensing_interpolation',
+        'cubeshape_imageplane',
+    ]
     _globals = {}
 
     for k in keys_globals:

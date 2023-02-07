@@ -1106,6 +1106,7 @@ class ModelCube(Cube):
             xx_grid_image=datacube.xgrid,
             yy_grid_image=datacube.ygrid,
             vv_grid_image=datacube.vgrid,
+            cubeshape_imageplane=datacube.imageplane.shape,
             lensing=lensing,
             create_interpolate_lensing=create_interpolate_lensing,
             upsampling_rate=upsampling_rate,
