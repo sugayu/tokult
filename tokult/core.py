@@ -491,6 +491,7 @@ class Tokult:
             header=header,
             index_hdul=index_hdul,
         )
+        self.gravlens.match_wcs_with(self.datacube)
 
     def construct_modelcube(self, params: tuple[float, ...]) -> None:
         '''Construct ``modelcube`` from the input parameters.
@@ -1509,6 +1510,7 @@ class GravLens:
                 assert isinstance((fname_y := data_or_fname_y), str)
                 loaded = cls.loadfits(fname_x, fname_y, index_hdul=index_hdul)
                 x_arcsec, y_arcsec = cls.convert_xy_pixel_to_arcsec(*loaded)
+                header = loaded[2]
                 return cls(x_arcsec, y_arcsec, header, *redshifts)
 
         elif (data_or_fname := data_or_fname_psi_arcsec) is not None:
@@ -1708,7 +1710,7 @@ class GravLens:
                 and y in arcsec.
 
         Examples:
-            >>> x_arcsec, y_arcsec = gl.convert_xy_pixel_to_arcsec(x_pix, y_pix)
+            >>> x_arcsec, y_arcsec = gl.convert_xy_pixel_to_arcsec(x_pix, y_pix, header)
 
         Nonte:
             Assumes that the units of "CDELT1" and "CDELT2" are degree.
