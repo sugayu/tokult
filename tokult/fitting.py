@@ -951,6 +951,7 @@ def initialize_globalparameters_for_uv(
     size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis / size
     cube_error = np.sqrt(abs(beam_vis.real)) / beam_vis / np.sqrt(norm_weight) / size
+    cube_error[cube_error == 0] = cube_error.max()  # to prevent divide-by-zero
     cube_error = _correct_cube_error_for_uv(cube_error)
     cubeshape = datacube.original[datacube.vslice, :, :].shape
     cubeshape_imageplane = datacube.imageplane.shape

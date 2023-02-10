@@ -546,6 +546,7 @@ class Tokult:
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
         uvpsf = misc.rfft2(self.dirtybeam.original)
+        uvpsf[uvpsf == 0] = misc.min_abs(uvpsf)  # to prevent divide-by-zero
         uv_noise = uv / np.sqrt(abs(uvpsf.real))
 
         # Noise computed from side channels of (v0-1, v1)
@@ -1180,6 +1181,8 @@ class DirtyBeam:
         self.imageplane = beam
         self.header = header
         self.uvplane = misc.rfft2(self.original)
+        # sometimes divide by zero encountered in fitting
+        self.uvplane[self.uvplane == 0] = misc.min_abs(self.uvplane)
 
     @classmethod
     def create(
@@ -1319,6 +1322,8 @@ class DirtyBeam:
         vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
         self.imageplane = self.original[vslice, yslice, xslice]
         self.uvplane = misc.rfft2(self.original[vslice, :, :])
+        # sometimes divide by zero encountered in fitting
+        self.uvplane[self.uvplane == 0] = misc.min_abs(self.uvplane)
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a region with the same size of the input ``cube``.
