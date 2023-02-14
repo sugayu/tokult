@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Getting Started &mdash; tokult  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -10,11 +11,10 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
         <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -28,11 +28,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> tokult
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            tokult
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -55,6 +59,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
 </ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a></li>
+</ul>
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">tokult</a></li>
@@ -74,8 +82,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Getting Started</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Getting Started</li>
       <li class="wy-breadcrumbs-aside">
               <!-- User defined GitHub URL -->
               <a href="https://github.com/sugayu/tokult/tree/dev" class="fa fa-github"> Edit on GitHub</a>
@@ -86,88 +94,93 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="getting-started">
+  <section id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this heading"></a></h1>
-<div class="section" id="preparing-data">
+<section id="preparing-data">
 <h2>Preparing Data<a class="headerlink" href="#preparing-data" title="Permalink to this heading"></a></h2>
 <p>The tutorial data are provided in this url:
 <a class="reference external" href="https://github.com/sugayu/tokult/tree/dev/tutorial">https://github.com/sugayu/tokult/tree/dev/tutorial</a>. Download the data
 and put them on a directory to work in. You can download the data from
 the terminal with:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ svn <span class="nb">export</span> https://github.com/sugayu/tokult/branches/dev/tutorial/
-$ <span class="nb">cd</span> tutorial
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>svn<span class="w"> </span><span class="nb">export</span><span class="w"> </span>https://github.com/sugayu/tokult/branches/dev/tutorial/
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>tutorial
 </pre></div>
 </div>
-<p>Here lists the donwloaded data.</p>
+<p>The donwloaded data are:</p>
 <dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">mockcube_dirty_tutorial.fits</span></code></dt><dd><p>The ALMA mock dirty cube with <em>natural</em> weighting.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_mockcube_dirty.fits</span></code></dt><dd><p>The ALMA mock dirty cube with <em>natural</em> weighting.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty_tutorial.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>natural</em> weighting.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_cube_dirty.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>natural</em> weighting.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">cube_dirty_tutorial_uniform.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>uniform</em> weighting.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_cube_dirty_uniform.psf.fits</span></code></dt><dd><p>The ALMA dirty beam with <em>uniform</em> weighting.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">gamma1_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_1\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_x-arcsec-deflect.fits</span></code></dt><dd><p>The map of the deflection angles along the <span class="math notranslate nohighlight">\(x\)</span> axis.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">gamma2_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\gamma_2\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_y-arcsec-deflect.fits</span></code></dt><dd><p>The map of the deflection angles along the <span class="math notranslate nohighlight">\(y\)</span> axis.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">kappa_tutorial.fits</span></code></dt><dd><p>The map of lensing parameter <span class="math notranslate nohighlight">\(\kappa\)</span>.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">tokult_gamma1.fits</span></code>, <code class="docutils literal notranslate"><span class="pre">tokult_gamma2.fits</span></code>, <code class="docutils literal notranslate"><span class="pre">tokult_kappa.fits</span></code></dt><dd><p>The gamma1, gamma2, and kappa lensing parameter maps. Not needed in
+this tutorial.</p>
 </dd>
 </dl>
-</div>
-<div class="section" id="quickstart">
+</section>
+<section id="quickstart">
 <h2>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this heading"></a></h2>
-<div class="section" id="launching-a-tokult-instance">
+<section id="launching-a-tokult-instance">
 <h3>Launching a Tokult instance<a class="headerlink" href="#launching-a-tokult-instance" title="Permalink to this heading"></a></h3>
 <p>First of all, import the Tokult package and then launch <code class="docutils literal notranslate"><span class="pre">Tokult</span></code> by
-setting input file names.</p>
+inputting the file names.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">tokult</span>
 
 <span class="n">tok</span> <span class="o">=</span> <span class="n">tokult</span><span class="o">.</span><span class="n">Tokult</span><span class="o">.</span><span class="n">launch</span><span class="p">(</span>
-    <span class="s1">&#39;mockcube_dirty_tutorial.fits&#39;</span><span class="p">,</span>
-    <span class="s1">&#39;cube_dirty_tutorial.psf.fits&#39;</span><span class="p">,</span>
-    <span class="p">(</span><span class="s1">&#39;gamma1_tutorial.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;gamma2_tutorial.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;kappa_tutorial.fits&#39;</span><span class="p">),</span>
+    <span class="s1">&#39;tokult_mockcube_dirty.fits&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;tokult_cube_dirty.psf.fits&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s1">&#39;tokult_x-arcsec-deflect.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;tokult_y-arcsec-deflect.fits&#39;</span><span class="p">),</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>The basic fitting modules of Tokult can be manipulated from <code class="docutils literal notranslate"><span class="pre">tok</span></code>.</p>
-<p>Next, Tokult needs to know which pixles you want to use for the model
-fitting. In addition, the lensing parameters (<span class="math notranslate nohighlight">\(\gamma_1\)</span>,
-<span class="math notranslate nohighlight">\(\gamma_2\)</span>, and <span class="math notranslate nohighlight">\(\kappa\)</span>) need a correction using redshifts
-of the lensing cluster and the target object. <code class="docutils literal notranslate"><span class="pre">tok</span></code> can take these
-parameters with the methods <code class="docutils literal notranslate"><span class="pre">use_region()</span></code> and <code class="docutils literal notranslate"><span class="pre">use_redshifts()</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tok</span></code> provides basic fitting modules of Tokult. The first argument
+takes the file name or the <code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code> of the data cube, the second
+takes the dirty beam (point spread function), and the third takes the
+lensing parameters summarized in a tuple.</p>
+<p>Next, Tokult needs to know which cubic region you want to use for the
+model fitting. The current code does not work without specifying the
+region. In addition, the lensing parameters (x-deflection and
+y-deflection) need redshifts of the lensing cluster and the target
+object; in this tutorial, the cluster and mock galaxy are assumed at z =
+0.541 and z = 1.7, respectively. <code class="docutils literal notranslate"><span class="pre">tok</span></code> can take these parameters with
+the methods <code class="docutils literal notranslate"><span class="pre">use_region()</span></code> and <code class="docutils literal notranslate"><span class="pre">use_redshifts()</span></code>.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">tok</span><span class="o">.</span><span class="n">use_region</span><span class="p">(</span><span class="n">xlim</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">96</span><span class="p">),</span> <span class="n">ylim</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">96</span><span class="p">),</span> <span class="n">vlim</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">12</span><span class="p">))</span>
-<span class="c1"># tok.use_redshifts(z_lens=0.541, z_source=1000)  # not used in this tutorial.</span>
+<span class="n">tok</span><span class="o">.</span><span class="n">use_redshifts</span><span class="p">(</span><span class="n">z_lens</span><span class="o">=</span><span class="mf">0.541</span><span class="p">,</span> <span class="n">z_source</span><span class="o">=</span><span class="mf">1.7</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">xlim</span></code>, <code class="docutils literal notranslate"><span class="pre">ylim</span></code>, and <code class="docutils literal notranslate"><span class="pre">vlim</span></code> determine the size of an argument
 <code class="docutils literal notranslate"><span class="pre">tok.datacube.imageplane</span></code> and others. The redshift information is
 stored in internal parameters and also used to convert the parameters to
 those in physical units later.</p>
-</div>
-<div class="section" id="uv-coverage">
+</section>
+<section id="uv-coverage">
 <h3><em>uv</em>-coverage<a class="headerlink" href="#uv-coverage" title="Permalink to this heading"></a></h3>
 <p>This step can be skipped if you use the image-plane fitting. The current
-code requires a resampled <em>uv</em> coverage of the observations for fitting
-on the <em>uv</em> plane. The <em>uv</em> coverage can be obtained from a dirty beam
+<em>uv</em>-plane fitting requires a re-sampled <em>uv</em> coverage of the
+observations. The <em>uv</em> coverage can be obtained from a dirty beam
 created with <em>uniform</em> weighting.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
 
-<span class="n">hudl</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;cube_dirty_tutorial_uniform.psf.fits&#39;</span><span class="p">)</span>
-<span class="n">uvpsf_uniform</span> <span class="o">=</span> <span class="n">tokult</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">rfft2</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">hudl</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
-<span class="n">uvcoverage</span> <span class="o">=</span> <span class="p">(</span><span class="n">uvpsf_uniform</span><span class="p">[</span><span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">vslice</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:])</span> <span class="o">&gt;</span> <span class="mf">1.0e-5</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s1">&#39;tokult_cube_dirty_uniform.psf.fits&#39;</span><span class="p">)</span>
+<span class="n">uvpsf_uniform</span> <span class="o">=</span> <span class="n">tokult</span><span class="o">.</span><span class="n">misc</span><span class="o">.</span><span class="n">rfft2</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+<span class="n">uvcoverage</span> <span class="o">=</span> <span class="p">(</span><span class="n">uvpsf_uniform</span><span class="p">[</span><span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">vslice</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:])</span> <span class="o">&gt;</span> <span class="mf">1.0e-5</span>  <span class="c1"># This value 1.0e-5 is like arbitrary.</span>
 </pre></div>
 </div>
-<p>Here, <code class="docutils literal notranslate"><span class="pre">uvcoverage</span></code> is a mask, i.e., <code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code> including <code class="docutils literal notranslate"><span class="pre">True</span></code>
-or <code class="docutils literal notranslate"><span class="pre">False</span></code>; <code class="docutils literal notranslate"><span class="pre">True</span></code> indicates that the pixels are used in fitting and
-vice versa.</p>
-</div>
-<div class="section" id="setting-guessing-initial-parameters-and-bounding">
+<p>Here, <code class="docutils literal notranslate"><span class="pre">uvcoverage</span></code> is a mask, i.e., <code class="docutils literal notranslate"><span class="pre">np.ndarray</span></code> including Boolean;
+<code class="docutils literal notranslate"><span class="pre">True</span></code> indicates that the pixels are used in fitting and vice versa.</p>
+</section>
+<section id="setting-guessing-initial-parameters-and-bounding">
 <h3>Setting/Guessing initial parameters and bounding<a class="headerlink" href="#setting-guessing-initial-parameters-and-bounding" title="Permalink to this heading"></a></h3>
 <p>Initial parameters for fitting can be set by hand, or Tokult employs the
 method <code class="docutils literal notranslate"><span class="pre">initialguess</span></code> to estimate initial parameters from the moment-0
 and 1 maps. Tokult also provides <code class="docutils literal notranslate"><span class="pre">tokult.get_bound_params()</span></code>, which
-makes it easy to specify the boundary information.</p>
+makes it easy to specify the parameter boundaries.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">init</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">initialguess</span><span class="p">()</span>
 <span class="n">init</span> <span class="o">=</span> <span class="n">init</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">mass_dyn</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>  <span class="c1"># To fix a bug(?)</span>
 <span class="n">bound</span> <span class="o">=</span> <span class="n">tokult</span><span class="o">.</span><span class="n">get_bound_params</span><span class="p">(</span>
@@ -182,21 +195,22 @@ makes it easy to specify the boundary information.</p>
 </pre></div>
 </div>
 <p>The fitting parameters are explained here [TBD].</p>
-</div>
-<div class="section" id="quick-initial-fitting">
+</section>
+<section id="quick-initial-fitting">
 <h3>Quick initial fitting<a class="headerlink" href="#quick-initial-fitting" title="Permalink to this heading"></a></h3>
 <p>Now you are ready! First, let’s try to perform fitting on the image
 plane with the least-square method.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The least-square method may fall in the local minimum if the initial
+<p>The least-square method may fall in local minima if the initial
 parameters are far from the true values, but it is useful to know
 whether the fitting code works.</p>
 </div>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">imagefit</span><span class="p">(</span><span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">bound</span><span class="p">,</span> <span class="n">optimization</span><span class="o">=</span><span class="s1">&#39;ls&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Done. Let’s check the fitting results, which are contained in <code class="docutils literal notranslate"><span class="pre">sol</span></code>.</p>
+<p>Done. Let’s check the fitting results, which are contained in <code class="docutils literal notranslate"><span class="pre">sol</span></code>.
+The best fit parameters are contained in <code class="docutils literal notranslate"><span class="pre">sol.best</span></code>:</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span><span class="o">.</span><span class="n">best</span>
 </pre></div>
 </div>
@@ -205,8 +219,8 @@ whether the fitting code works.</p>
 </pre></div>
 </div>
 </div>
-<p>The output values are in units of <em>pixels</em>, which are simple units used
-in the code. The physical units are added by:</p>
+<p>These output values are in units of <em>pixels</em> for simplicity in the code.
+The physical units are added by:</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span><span class="o">.</span><span class="n">add_units</span><span class="p">()</span>
 </pre></div>
 </div>
@@ -215,6 +229,8 @@ in the code. The physical units are added by:</p>
 </pre></div>
 </div>
 </div>
+<p>The method <code class="docutils literal notranslate"><span class="pre">add_units()</span></code> makes use of the header information of the
+data and the lensing parameter map.</p>
 <p>The best-fit result can be visualized by like this:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
@@ -230,27 +246,29 @@ in the code. The physical units are added by:</p>
 <p>The left and middle panels show the moment-0 maps of the data and
 best-fit model, respectively. The data was well-reproduced by the model,
 and the residual map looks like pure noises as the right panel.</p>
-</div>
-<div class="section" id="restarting-model-fit">
+</section>
+<section id="restarting-model-fit">
 <h3>Restarting model-fit<a class="headerlink" href="#restarting-model-fit" title="Permalink to this heading"></a></h3>
 <p>It is known that the least-square method may underestimate the fitting
 uncertainties for the spatially-correlated data. To obtain correct
-uncertainties, as well as to escape from the local minimum, the MCMC
+uncertainties, as well as to escape from shallow local minima, the MCMC
 method on the <em>uv</em> plane is a great option.</p>
 <p>Let’s fit an example data; but it takes more than the least-square
-method, maybe <strong>&gt;~10 minuts</strong> for the tutorial data.</p>
+method, maybe <strong>&gt;~10 minutes</strong> for the tutorial data.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">sol</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">uvfit</span><span class="p">(</span>
     <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">bound</span><span class="p">,</span> <span class="n">mask_for_fit</span><span class="o">=</span><span class="n">uvcoverage</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span>
 <span class="p">)</span>
 </pre></div>
 </div>
 <div class="results drawer docutils container">
-<p>100%|█████████████████████████████|5000/5000 [18:57&lt;00:00, 4.40it/s]</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>100%|███████████████████████|5000/5000 [18:57&lt;00:00,  4.40it/s]
+</pre></div>
+</div>
 </div>
 <p>If you want to use parallelization, please see [TBD].</p>
-</div>
-</div>
-<div class="section" id="parallelization">
+</section>
+</section>
+<section id="parallelization">
 <h2>Parallelization<a class="headerlink" href="#parallelization" title="Permalink to this heading"></a></h2>
 <p>Short code as an example.</p>
 <div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">multiprocessing</span>
@@ -265,8 +283,8 @@ method, maybe <strong>&gt;~10 minuts</strong> for the tutorial data.</p>
     <span class="p">)</span>
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tokult &mdash; tokult  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -10,11 +11,10 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -26,11 +26,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="#" class="icon icon-home"> tokult
+
+          
+          
+          <a href="#" class="icon icon-home">
+            tokult
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -40,6 +44,10 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul>
@@ -60,8 +68,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
-      <li>Tokult</li>
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Tokult</li>
       <li class="wy-breadcrumbs-aside">
               <!-- User defined GitHub URL -->
               <a href="https://github.com/sugayu/tokult/tree/dev" class="fa fa-github"> Edit on GitHub</a>
@@ -72,16 +80,15 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="tokult">
+  <section id="tokult">
 <h1>Tokult<a class="headerlink" href="#tokult" title="Permalink to this heading"></a></h1>
-</div>
-<div class="section" id="tool-of-kinematics-on-uv-plane-for-lensed-targets">
-<h1>Tool of Kinematics on uv-plane for Lensed Targets<a class="headerlink" href="#tool-of-kinematics-on-uv-plane-for-lensed-targets" title="Permalink to this heading"></a></h1>
+<section id="tool-of-kinematics-on-uv-plane-for-lensed-targets">
+<h2>Tool of Kinematics on uv-plane for Lensed Targets<a class="headerlink" href="#tool-of-kinematics-on-uv-plane-for-lensed-targets" title="Permalink to this heading"></a></h2>
 <p>Tokult is a tool to analyze the kinematics of galaxies.</p>
 <p>Tokult is created to fit the 3D data cubes, especially ALMA cube images,
 but applicable to other IFU data formats.</p>
-<div class="section" id="requirements">
-<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this heading"></a></h2>
+<section id="requirements">
+<h3>Requirements<a class="headerlink" href="#requirements" title="Permalink to this heading"></a></h3>
 <p>Required Python version:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://www.python.org">Python</a> 3.9 or later</p></li>
@@ -98,17 +105,17 @@ but applicable to other IFU data formats.</p>
 <li><p><a class="reference external" href="https://emcee.readthedocs.io/en/stable/">emcee</a> 3.0.0 or later</p></li>
 <li><p><a class="reference external" href="https://tqdm.github.io">tqdm</a></p></li>
 </ul>
-</div>
-<div class="section" id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h2>
+</section>
+<section id="installation">
+<h3>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h3>
 <p>You can install Tokult from the github repository using <code class="docutils literal notranslate"><span class="pre">pip</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pip install git+https://github.com/sugayu/tokult.git@dev
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>git+https://github.com/sugayu/tokult.git@dev
 </pre></div>
 </div>
 <p>Before using this command, it may be good to create a new Python
 environment for Tokult.</p>
 <p>To update the package, you may need to add the <code class="docutils literal notranslate"><span class="pre">--upgrade</span></code> option.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pip install --upgrade git+https://github.com/sugayu/tokult.git@dev
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>git+https://github.com/sugayu/tokult.git@dev
 </pre></div>
 </div>
 <div class="admonition note">
@@ -136,6 +143,16 @@ public.</p>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="how_to_make_noises.html#noise-added-mock-cubes-for-monte-carlo-fitting">Noise-added mock cubes for Monte Carlo fitting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_to_make_noises.html#spatially-correlated-noise-maps">Spatially correlated noise maps</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">tokult</a><ul>
@@ -157,16 +174,17 @@ public.</p>
 </li>
 </ul>
 </div>
-</div>
-</div>
-<div class="section" id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this heading"></a></h1>
+</section>
+</section>
+<section id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
 <li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
 </ul>
-</div>
+</section>
+</section>
 
 
            </div>

@@ -68,6 +68,12 @@ To update the package, you may need to add the ``--upgrade`` option.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Tips:
+
+   how_to_make_noises
+
+.. toctree::
+   :maxdepth: 2
    :caption: Modules:
 
    modules

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Visualization &mdash; tokult  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -10,15 +11,14 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="tokult" href="modules.html" />
+    <link rel="next" title="How to make mock noises?" href="how_to_make_noises.html" />
     <link rel="prev" title="Getting Started" href="gettingstarted.html" /> 
 </head>
 
@@ -27,11 +27,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> tokult
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            tokult
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -47,6 +51,10 @@
 <li class="toctree-l2"><a class="reference internal" href="#convergence-of-mcmc-sampler">Convergence of MCMC sampler</a></li>
 </ul>
 </li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul>
@@ -67,8 +75,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Visualization</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Visualization</li>
       <li class="wy-breadcrumbs-aside">
               <!-- User defined GitHub URL -->
               <a href="https://github.com/sugayu/tokult/tree/dev" class="fa fa-github"> Edit on GitHub</a>
@@ -79,12 +87,12 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="visualization">
+  <section id="visualization">
 <h1>Visualization<a class="headerlink" href="#visualization" title="Permalink to this heading"></a></h1>
 <p>This visualization tutorial uses an instance <code class="docutils literal notranslate"><span class="pre">tok</span></code> and <code class="docutils literal notranslate"><span class="pre">sol</span></code>
 obtained by fitting the tutorial data according to
 <a class="reference internal" href="gettingstarted.html"><span class="doc">Getting Started</span></a>.</p>
-<div class="section" id="moment-0-map">
+<section id="moment-0-map">
 <h2>Moment 0 map<a class="headerlink" href="#moment-0-map" title="Permalink to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">Cube.moment0()</span></code> reutrns the moment-0 (integrated-flux) map of the
 data cube. The best-fit model cube is stored in the <code class="docutils literal notranslate"><span class="pre">tok</span></code> as
@@ -101,8 +109,8 @@ data cube. The best-fit model cube is stored in the <code class="docutils litera
 <div class="results drawer docutils container">
 <img alt="_images/fig_moment0.png" src="_images/fig_moment0.png" />
 </div>
-</div>
-<div class="section" id="moment-1-map">
+</section>
+<section id="moment-1-map">
 <h2>Moment 1 map<a class="headerlink" href="#moment-1-map" title="Permalink to this heading"></a></h2>
 <p>Similar to the moment-0 map, <code class="docutils literal notranslate"><span class="pre">DataCube.pixmoment1()</span></code> reutrns the
 moment-1 (velocity) map of the data cube.</p>
@@ -122,8 +130,8 @@ moment-1 (velocity) map of the data cube.</p>
 <div class="results drawer docutils container">
 <img alt="_images/fig_moment1.png" src="_images/fig_moment1.png" />
 </div>
-</div>
-<div class="section" id="cube-animation">
+</section>
+<section id="cube-animation">
 <h2>Cube animation<a class="headerlink" href="#cube-animation" title="Permalink to this heading"></a></h2>
 <p>There are several ways (including those not written in this section) to
 illustrate a 3D cube on python.</p>
@@ -171,8 +179,8 @@ velocity axis.</p>
 <img alt="_images/anime_cube.gif" src="_images/anime_cube.gif" />
 </div>
 <p>…why does this animation have so poor image quality?</p>
-</div>
-<div class="section" id="convergence-of-mcmc-sampler">
+</section>
+<section id="convergence-of-mcmc-sampler">
 <h2>Convergence of MCMC sampler<a class="headerlink" href="#convergence-of-mcmc-sampler" title="Permalink to this heading"></a></h2>
 <p>The MCMC sampler during the MCMC fitting are stored in the solution,
 <code class="docutils literal notranslate"><span class="pre">sol.sampler</span></code>. You can check whether the MCMC fiting is converged
@@ -201,15 +209,15 @@ exists <code class="docutils literal notranslate"><span class="pre">sol.sampler<
 </div>
 <p>Tokult implement <code class="docutils literal notranslate"><span class="pre">emcee</span></code> as a MCMC sampler, so please see the
 <code class="docutils literal notranslate"><span class="pre">emcee</span></code> document for the details of how to manipulate the sampler.</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="gettingstarted.html" class="btn btn-neutral float-left" title="Getting Started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="modules.html" class="btn btn-neutral float-right" title="tokult" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_to_make_noises.html" class="btn btn-neutral float-right" title="How to make mock noises?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

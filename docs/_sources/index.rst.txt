@@ -3,6 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+======
 Tokult
 ======
 
@@ -64,6 +65,12 @@ To update the package, you may need to add the ``--upgrade`` option.
 
    gettingstarted
    visualization
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tips:
+
+   how_to_make_noises
 
 .. toctree::
    :maxdepth: 2
