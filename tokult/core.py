@@ -447,6 +447,9 @@ class Tokult:
         '''Change the variable ``datacube``.
 
         May be useful to change ``datacube`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.datacube = DataCube.create(
             data_or_fname, header=header, index_hdul=index_hdul
@@ -462,6 +465,9 @@ class Tokult:
         '''Change the variable ``dirtybeam``.
 
         May be useful to change ``dirtybeam`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.dirtybeam = DirtyBeam.create(
             data_or_fname, header=header, index_hdul=index_hdul
@@ -483,6 +489,9 @@ class Tokult:
         '''Change the variable ``gravlens``.
 
         May be useful to change ``gravlens`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.gravlens = GravLens.create(
             data_or_fname_xy_arcsec_deflect=data_or_fname_xy_arcsec_deflect,
