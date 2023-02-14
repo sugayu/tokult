@@ -24,14 +24,14 @@ The donwloaded data are:
 
 # #+begin_src ipython :exports both :results raw drawer
 #   import os
-#   os.chdir('/Users/yumaimac2/Documents/research/2022_dynamics_fitting/example/')
+#   os.chdir('/Users/yumapro/src/python/tokult/tutorial/')
 #   os.getcwd()
 # #+end_src
 
 # #+RESULTS:
 # :results:
-# # Out[4]:
-# : '/Users/yumaimac2/Documents/research/2022_dynamics_fitting/example'
+# # Out[1]:
+# : '/Users/yumapro/src/python/tokult/tutorial'
 # :end:
 
 * Quickstart
