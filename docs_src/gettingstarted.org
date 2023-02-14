@@ -18,17 +18,20 @@ The donwloaded data are:
 - ~tokult_cube_dirty_uniform.psf.fits~ :: The ALMA dirty beam with /uniform/ weighting.
 - ~tokult_x-arcsec-deflect.fits~ :: The map of the deflection angles along the \(x\) axis.
 - ~tokult_y-arcsec-deflect.fits~ :: The map of the deflection angles along the \(y\) axis.
+- ~tokult_gamma1.fits~, ~tokult_gamma2.fits~, ~tokult_kappa.fits~ :: The gamma1, gamma2, and kappa lensing parameter maps.
+  Not needed in this tutorial.
+
 
 # #+begin_src ipython :exports both :results raw drawer
 #   import os
-#   os.chdir('/Users/yumaimac2/Documents/research/2022_dynamics_fitting/example/')
+#   os.chdir('/Users/yumapro/src/python/tokult/tutorial/')
 #   os.getcwd()
 # #+end_src
 
 # #+RESULTS:
 # :results:
-# # Out[4]:
-# : '/Users/yumaimac2/Documents/research/2022_dynamics_fitting/example'
+# # Out[1]:
+# : '/Users/yumapro/src/python/tokult/tutorial'
 # :end:
 
 * Quickstart

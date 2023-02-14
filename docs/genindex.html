@@ -10,11 +10,10 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="#" />
     <link rel="search" title="Search" href="search.html" /> 
@@ -25,11 +24,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> tokult
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            tokult
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -39,6 +42,10 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul>
@@ -59,8 +66,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Index</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Index</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -138,10 +145,28 @@
         <li><a href="tokult.html#tokult.Tokult.change_gravlens">(tokult.Tokult method)</a>
 </li>
       </ul></li>
+      <li><a href="tokult.html#tokult.core.GravLens.compute_deflection_angles">compute_deflection_angles() (tokult.core.GravLens method)</a>
+
+      <ul>
+        <li><a href="tokult.html#tokult.GravLens.compute_deflection_angles">(tokult.GravLens method)</a>
+</li>
+      </ul></li>
       <li><a href="tokult.html#tokult.core.Tokult.construct_modelcube">construct_modelcube() (tokult.core.Tokult method)</a>
 
       <ul>
         <li><a href="tokult.html#tokult.Tokult.construct_modelcube">(tokult.Tokult method)</a>
+</li>
+      </ul></li>
+      <li><a href="tokult.html#tokult.core.GravLens.convert_xy_arcsec_to_pixel">convert_xy_arcsec_to_pixel() (tokult.core.GravLens static method)</a>
+
+      <ul>
+        <li><a href="tokult.html#tokult.GravLens.convert_xy_arcsec_to_pixel">(tokult.GravLens static method)</a>
+</li>
+      </ul></li>
+      <li><a href="tokult.html#tokult.core.GravLens.convert_xy_pixel_to_arcsec">convert_xy_pixel_to_arcsec() (tokult.core.GravLens static method)</a>
+
+      <ul>
+        <li><a href="tokult.html#tokult.GravLens.convert_xy_pixel_to_arcsec">(tokult.GravLens static method)</a>
 </li>
       </ul></li>
       <li><a href="tokult.html#tokult.core.DirtyBeam.convolve">convolve() (tokult.core.DirtyBeam method)</a>
@@ -170,6 +195,12 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="tokult.html#tokult.core.GravLens.create_interpolate_lensing">create_interpolate_lensing() (tokult.core.GravLens method)</a>
+
+      <ul>
+        <li><a href="tokult.html#tokult.GravLens.create_interpolate_lensing">(tokult.GravLens method)</a>
+</li>
+      </ul></li>
       <li><a href="tokult.html#tokult.core.Cube.create_noise">create_noise() (tokult.core.Cube static method)</a>
 
       <ul>
@@ -280,16 +311,22 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="tokult.html#tokult.core.GravLens.get_jacob">get_jacob() (tokult.core.GravLens method)</a>
+      <li><a href="tokult.html#tokult.core.GravLens.gradient">gradient() (tokult.core.GravLens static method)</a>
 
       <ul>
-        <li><a href="tokult.html#tokult.GravLens.get_jacob">(tokult.GravLens method)</a>
+        <li><a href="tokult.html#tokult.GravLens.gradient">(tokult.GravLens static method)</a>
 </li>
       </ul></li>
       <li><a href="tokult.html#tokult.GravLens">GravLens (class in tokult)</a>
 
       <ul>
         <li><a href="tokult.html#tokult.core.GravLens">(class in tokult.core)</a>
+</li>
+      </ul></li>
+      <li><a href="tokult.html#tokult.GravLens.LensingInterpolate">GravLens.LensingInterpolate (class in tokult)</a>
+
+      <ul>
+        <li><a href="tokult.html#tokult.core.GravLens.LensingInterpolate">(class in tokult.core)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -398,12 +435,6 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="tokult.html#tokult.core.GravLens.magnification">magnification() (tokult.core.GravLens method)</a>
-
-      <ul>
-        <li><a href="tokult.html#tokult.GravLens.magnification">(tokult.GravLens method)</a>
-</li>
-      </ul></li>
       <li><a href="tokult.html#tokult.FitParamsWithUnits.mass_dyn">mass_dyn (tokult.FitParamsWithUnits attribute)</a>
 
       <ul>
@@ -428,8 +459,6 @@
         <li><a href="tokult.html#tokult.core.ModelCube">(class in tokult.core)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     module
 
@@ -453,6 +482,8 @@
         <li><a href="tokult.html#module-tokult.misc">tokult.misc</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="tokult.html#tokult.core.Cube.moment0">moment0() (tokult.core.Cube method)</a>
 
       <ul>

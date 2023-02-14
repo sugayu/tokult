@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>tokult &mdash; tokult  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -10,16 +11,15 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="tokult package" href="tokult.html" />
-    <link rel="prev" title="Visualization" href="visualization.html" /> 
+    <link rel="prev" title="How to make mock noises?" href="how_to_make_noises.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -27,11 +27,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> tokult
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            tokult
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -41,6 +45,10 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="how_to_make_noises.html">How to make mock noises?</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
 <ul class="current">
@@ -64,8 +72,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>tokult</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tokult</li>
       <li class="wy-breadcrumbs-aside">
               <!-- User defined GitHub URL -->
               <a href="https://github.com/sugayu/tokult/tree/dev" class="fa fa-github"> Edit on GitHub</a>
@@ -76,32 +84,268 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="tokult">
+  <section id="tokult">
 <h1>tokult<a class="headerlink" href="#tokult" title="Permalink to this heading"></a></h1>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="tokult.html">tokult package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult">Module contents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult">Module contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.Tokult"><code class="docutils literal notranslate"><span class="pre">Tokult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.launch"><code class="docutils literal notranslate"><span class="pre">Tokult.launch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.imagefit"><code class="docutils literal notranslate"><span class="pre">Tokult.imagefit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.uvfit"><code class="docutils literal notranslate"><span class="pre">Tokult.uvfit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.initialguess"><code class="docutils literal notranslate"><span class="pre">Tokult.initialguess()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.use_region"><code class="docutils literal notranslate"><span class="pre">Tokult.use_region()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.use_redshifts"><code class="docutils literal notranslate"><span class="pre">Tokult.use_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.change_datacube"><code class="docutils literal notranslate"><span class="pre">Tokult.change_datacube()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.change_dirtybeam"><code class="docutils literal notranslate"><span class="pre">Tokult.change_dirtybeam()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.change_gravlens"><code class="docutils literal notranslate"><span class="pre">Tokult.change_gravlens()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.construct_modelcube"><code class="docutils literal notranslate"><span class="pre">Tokult.construct_modelcube()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Tokult.calculate_normweight"><code class="docutils literal notranslate"><span class="pre">Tokult.calculate_normweight()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.Cube"><code class="docutils literal notranslate"><span class="pre">Cube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.imageplane"><code class="docutils literal notranslate"><span class="pre">Cube.imageplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.uvplane"><code class="docutils literal notranslate"><span class="pre">Cube.uvplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.original"><code class="docutils literal notranslate"><span class="pre">Cube.original</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.header"><code class="docutils literal notranslate"><span class="pre">Cube.header</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.cutout"><code class="docutils literal notranslate"><span class="pre">Cube.cutout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.rms"><code class="docutils literal notranslate"><span class="pre">Cube.rms()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.moment0"><code class="docutils literal notranslate"><span class="pre">Cube.moment0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.rms_moment0"><code class="docutils literal notranslate"><span class="pre">Cube.rms_moment0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.pixmoment1"><code class="docutils literal notranslate"><span class="pre">Cube.pixmoment1()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.pixmoment2"><code class="docutils literal notranslate"><span class="pre">Cube.pixmoment2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.noisy"><code class="docutils literal notranslate"><span class="pre">Cube.noisy()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.rfft2"><code class="docutils literal notranslate"><span class="pre">Cube.rfft2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.Cube.create_noise"><code class="docutils literal notranslate"><span class="pre">Cube.create_noise()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.DataCube"><code class="docutils literal notranslate"><span class="pre">DataCube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DataCube.perturbed"><code class="docutils literal notranslate"><span class="pre">DataCube.perturbed()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DataCube.create"><code class="docutils literal notranslate"><span class="pre">DataCube.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DataCube.loadfits"><code class="docutils literal notranslate"><span class="pre">DataCube.loadfits()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.ModelCube"><code class="docutils literal notranslate"><span class="pre">ModelCube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.ModelCube.create"><code class="docutils literal notranslate"><span class="pre">ModelCube.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.ModelCube.to_mockcube"><code class="docutils literal notranslate"><span class="pre">ModelCube.to_mockcube()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.DirtyBeam"><code class="docutils literal notranslate"><span class="pre">DirtyBeam</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.create"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.convolve"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.convolve()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.fullconvolve"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.fullconvolve()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.cutout"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.cutout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.cutout_to_match_with"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.cutout_to_match_with()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.DirtyBeam.loadfits"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.loadfits()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.GravLens"><code class="docutils literal notranslate"><span class="pre">GravLens</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.create"><code class="docutils literal notranslate"><span class="pre">GravLens.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.lensing"><code class="docutils literal notranslate"><span class="pre">GravLens.lensing()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.create_interpolate_lensing"><code class="docutils literal notranslate"><span class="pre">GravLens.create_interpolate_lensing()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.LensingInterpolate"><code class="docutils literal notranslate"><span class="pre">GravLens.LensingInterpolate</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.match_wcs_with"><code class="docutils literal notranslate"><span class="pre">GravLens.match_wcs_with()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.use_redshifts"><code class="docutils literal notranslate"><span class="pre">GravLens.use_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.reset_redshifts"><code class="docutils literal notranslate"><span class="pre">GravLens.reset_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.compute_deflection_angles"><code class="docutils literal notranslate"><span class="pre">GravLens.compute_deflection_angles()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.convert_xy_arcsec_to_pixel"><code class="docutils literal notranslate"><span class="pre">GravLens.convert_xy_arcsec_to_pixel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.convert_xy_pixel_to_arcsec"><code class="docutils literal notranslate"><span class="pre">GravLens.convert_xy_pixel_to_arcsec()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.gradient"><code class="docutils literal notranslate"><span class="pre">GravLens.gradient()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.get_angular_distance_ratio"><code class="docutils literal notranslate"><span class="pre">GravLens.get_angular_distance_ratio()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.GravLens.loadfits"><code class="docutils literal notranslate"><span class="pre">GravLens.loadfits()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.InputParams"><code class="docutils literal notranslate"><span class="pre">InputParams</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.x0_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.x0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.y0_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.y0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.PA_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.PA_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.inclination_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.inclination_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.radius_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.radius_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.velocity_sys"><code class="docutils literal notranslate"><span class="pre">InputParams.velocity_sys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.mass_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.mass_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.brightness_center"><code class="docutils literal notranslate"><span class="pre">InputParams.brightness_center</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.velocity_dispersion"><code class="docutils literal notranslate"><span class="pre">InputParams.velocity_dispersion</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.radius_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.radius_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.x0_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.x0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.y0_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.y0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.PA_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.PA_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.inclination_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.inclination_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.InputParams.to_units"><code class="docutils literal notranslate"><span class="pre">InputParams.to_units()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.x0_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.x0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.y0_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.y0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.PA_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.PA_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.inclination_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.inclination_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.radius_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.radius_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.velocity_sys"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.velocity_sys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.mass_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.mass_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.brightness_center"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.brightness_center</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.velocity_dispersion"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.velocity_dispersion</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.radius_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.radius_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.x0_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.x0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.y0_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.y0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.PA_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.PA_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.inclination_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.inclination_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.header"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.header</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.z"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.z</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.wcs"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.wcs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.pixelscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.pixelscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.freq_rest"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.freq_rest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.vpixelscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.vpixelscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.diskmassscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.diskmassscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.to_physicalscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.to_physicalscale()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.vmax"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.vmax()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.FitParamsWithUnits.from_inputparams"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.from_inputparams()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.get_bound_params"><code class="docutils literal notranslate"><span class="pre">get_bound_params()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.common">tokult.common module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.fitting">tokult.fitting module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.function">tokult.function module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.fitting">tokult.fitting module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams"><code class="docutils literal notranslate"><span class="pre">InputParams</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.x0_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.x0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.y0_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.y0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.PA_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.PA_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.inclination_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.inclination_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.radius_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.radius_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.velocity_sys"><code class="docutils literal notranslate"><span class="pre">InputParams.velocity_sys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.mass_dyn"><code class="docutils literal notranslate"><span class="pre">InputParams.mass_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.brightness_center"><code class="docutils literal notranslate"><span class="pre">InputParams.brightness_center</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.velocity_dispersion"><code class="docutils literal notranslate"><span class="pre">InputParams.velocity_dispersion</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.radius_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.radius_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.x0_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.x0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.y0_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.y0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.PA_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.PA_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.inclination_emi"><code class="docutils literal notranslate"><span class="pre">InputParams.inclination_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.InputParams.to_units"><code class="docutils literal notranslate"><span class="pre">InputParams.to_units()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.x0_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.x0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.y0_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.y0_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.PA_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.PA_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.inclination_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.inclination_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.radius_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.radius_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.velocity_sys"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.velocity_sys</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.mass_dyn"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.mass_dyn</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.brightness_center"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.brightness_center</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.velocity_dispersion"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.velocity_dispersion</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.radius_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.radius_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.x0_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.x0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.y0_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.y0_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.PA_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.PA_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.inclination_emi"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.inclination_emi</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.header"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.header</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.z"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.z</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.wcs"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.wcs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.pixelscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.pixelscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.freq_rest"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.freq_rest</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.vpixelscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.vpixelscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.diskmassscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.diskmassscale</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.to_physicalscale"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.to_physicalscale()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.vmax"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.vmax()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.fitting.FitParamsWithUnits.from_inputparams"><code class="docutils literal notranslate"><span class="pre">FitParamsWithUnits.from_inputparams()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.fitting.get_bound_params"><code class="docutils literal notranslate"><span class="pre">get_bound_params()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.function">tokult.function module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.function.gaussian"><code class="docutils literal notranslate"><span class="pre">gaussian()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.function.reciprocal_exp"><code class="docutils literal notranslate"><span class="pre">reciprocal_exp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.function.freeman_disk"><code class="docutils literal notranslate"><span class="pre">freeman_disk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.function.maximum_rotation_velocity"><code class="docutils literal notranslate"><span class="pre">maximum_rotation_velocity()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.misc">tokult.misc module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.casa">tokult.casa module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.casa_dummy">tokult.casa_dummy module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.core">tokult.core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.core">tokult.core module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.Tokult"><code class="docutils literal notranslate"><span class="pre">Tokult</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.launch"><code class="docutils literal notranslate"><span class="pre">Tokult.launch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.imagefit"><code class="docutils literal notranslate"><span class="pre">Tokult.imagefit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.uvfit"><code class="docutils literal notranslate"><span class="pre">Tokult.uvfit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.initialguess"><code class="docutils literal notranslate"><span class="pre">Tokult.initialguess()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.use_region"><code class="docutils literal notranslate"><span class="pre">Tokult.use_region()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.use_redshifts"><code class="docutils literal notranslate"><span class="pre">Tokult.use_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.change_datacube"><code class="docutils literal notranslate"><span class="pre">Tokult.change_datacube()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.change_dirtybeam"><code class="docutils literal notranslate"><span class="pre">Tokult.change_dirtybeam()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.change_gravlens"><code class="docutils literal notranslate"><span class="pre">Tokult.change_gravlens()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.construct_modelcube"><code class="docutils literal notranslate"><span class="pre">Tokult.construct_modelcube()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Tokult.calculate_normweight"><code class="docutils literal notranslate"><span class="pre">Tokult.calculate_normweight()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.Cube"><code class="docutils literal notranslate"><span class="pre">Cube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.imageplane"><code class="docutils literal notranslate"><span class="pre">Cube.imageplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.uvplane"><code class="docutils literal notranslate"><span class="pre">Cube.uvplane</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.original"><code class="docutils literal notranslate"><span class="pre">Cube.original</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.header"><code class="docutils literal notranslate"><span class="pre">Cube.header</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.cutout"><code class="docutils literal notranslate"><span class="pre">Cube.cutout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.rms"><code class="docutils literal notranslate"><span class="pre">Cube.rms()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.moment0"><code class="docutils literal notranslate"><span class="pre">Cube.moment0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.rms_moment0"><code class="docutils literal notranslate"><span class="pre">Cube.rms_moment0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.pixmoment1"><code class="docutils literal notranslate"><span class="pre">Cube.pixmoment1()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.pixmoment2"><code class="docutils literal notranslate"><span class="pre">Cube.pixmoment2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.noisy"><code class="docutils literal notranslate"><span class="pre">Cube.noisy()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.rfft2"><code class="docutils literal notranslate"><span class="pre">Cube.rfft2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.Cube.create_noise"><code class="docutils literal notranslate"><span class="pre">Cube.create_noise()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.DataCube"><code class="docutils literal notranslate"><span class="pre">DataCube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DataCube.perturbed"><code class="docutils literal notranslate"><span class="pre">DataCube.perturbed()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DataCube.create"><code class="docutils literal notranslate"><span class="pre">DataCube.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DataCube.loadfits"><code class="docutils literal notranslate"><span class="pre">DataCube.loadfits()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.ModelCube"><code class="docutils literal notranslate"><span class="pre">ModelCube</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.ModelCube.create"><code class="docutils literal notranslate"><span class="pre">ModelCube.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.ModelCube.to_mockcube"><code class="docutils literal notranslate"><span class="pre">ModelCube.to_mockcube()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam"><code class="docutils literal notranslate"><span class="pre">DirtyBeam</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.create"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.convolve"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.convolve()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.fullconvolve"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.fullconvolve()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.cutout"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.cutout()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.cutout_to_match_with"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.cutout_to_match_with()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.DirtyBeam.loadfits"><code class="docutils literal notranslate"><span class="pre">DirtyBeam.loadfits()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tokult.html#tokult.core.GravLens"><code class="docutils literal notranslate"><span class="pre">GravLens</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.create"><code class="docutils literal notranslate"><span class="pre">GravLens.create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.lensing"><code class="docutils literal notranslate"><span class="pre">GravLens.lensing()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.create_interpolate_lensing"><code class="docutils literal notranslate"><span class="pre">GravLens.create_interpolate_lensing()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.LensingInterpolate"><code class="docutils literal notranslate"><span class="pre">GravLens.LensingInterpolate</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.match_wcs_with"><code class="docutils literal notranslate"><span class="pre">GravLens.match_wcs_with()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.use_redshifts"><code class="docutils literal notranslate"><span class="pre">GravLens.use_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.reset_redshifts"><code class="docutils literal notranslate"><span class="pre">GravLens.reset_redshifts()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.compute_deflection_angles"><code class="docutils literal notranslate"><span class="pre">GravLens.compute_deflection_angles()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.convert_xy_arcsec_to_pixel"><code class="docutils literal notranslate"><span class="pre">GravLens.convert_xy_arcsec_to_pixel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.convert_xy_pixel_to_arcsec"><code class="docutils literal notranslate"><span class="pre">GravLens.convert_xy_pixel_to_arcsec()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.gradient"><code class="docutils literal notranslate"><span class="pre">GravLens.gradient()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.get_angular_distance_ratio"><code class="docutils literal notranslate"><span class="pre">GravLens.get_angular_distance_ratio()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tokult.html#tokult.core.GravLens.loadfits"><code class="docutils literal notranslate"><span class="pre">GravLens.loadfits()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="tokult.html#module-tokult.example">tokult.example module</a></li>
 </ul>
 </li>
 </ul>
 </div>
-</div>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="visualization.html" class="btn btn-neutral float-left" title="Visualization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="how_to_make_noises.html" class="btn btn-neutral float-left" title="How to make mock noises?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="tokult.html" class="btn btn-neutral float-right" title="tokult package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
