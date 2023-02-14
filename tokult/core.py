@@ -447,6 +447,9 @@ class Tokult:
         '''Change the variable ``datacube``.
 
         May be useful to change ``datacube`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.datacube = DataCube.create(
             data_or_fname, header=header, index_hdul=index_hdul
@@ -462,6 +465,9 @@ class Tokult:
         '''Change the variable ``dirtybeam``.
 
         May be useful to change ``dirtybeam`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.dirtybeam = DirtyBeam.create(
             data_or_fname, header=header, index_hdul=index_hdul
@@ -483,6 +489,9 @@ class Tokult:
         '''Change the variable ``gravlens``.
 
         May be useful to change ``gravlens`` of an instance.
+
+        Nonte:
+            This method should be used before ``use_region`` and ``use_redshift``.
         '''
         self.gravlens = GravLens.create(
             data_or_fname_xy_arcsec_deflect=data_or_fname_xy_arcsec_deflect,
@@ -491,6 +500,7 @@ class Tokult:
             header=header,
             index_hdul=index_hdul,
         )
+        self.gravlens.match_wcs_with(self.datacube)
 
     def construct_modelcube(self, params: tuple[float, ...]) -> None:
         '''Construct ``modelcube`` from the input parameters.
@@ -545,6 +555,7 @@ class Tokult:
         assert self.dirtybeam is not None
         uv = self.datacube.rfft2(self.datacube.original)
         uvpsf = misc.rfft2(self.dirtybeam.original)
+        uvpsf[uvpsf == 0] = misc.min_abs(uvpsf)  # to prevent divide-by-zero
         uv_noise = uv / np.sqrt(abs(uvpsf.real))
 
         # Noise computed from side channels of (v0-1, v1)
@@ -1106,6 +1117,7 @@ class ModelCube(Cube):
             xx_grid_image=datacube.xgrid,
             yy_grid_image=datacube.ygrid,
             vv_grid_image=datacube.vgrid,
+            cubeshape_imageplane=datacube.imageplane.shape,
             lensing=lensing,
             create_interpolate_lensing=create_interpolate_lensing,
             upsampling_rate=upsampling_rate,
@@ -1178,6 +1190,8 @@ class DirtyBeam:
         self.imageplane = beam
         self.header = header
         self.uvplane = misc.rfft2(self.original)
+        # sometimes divide by zero encountered in fitting
+        self.uvplane[self.uvplane == 0] = misc.min_abs(self.uvplane)
 
     @classmethod
     def create(
@@ -1317,6 +1331,8 @@ class DirtyBeam:
         vslice = slice(*vlim) if isinstance(vlim, tuple) else vlim
         self.imageplane = self.original[vslice, yslice, xslice]
         self.uvplane = misc.rfft2(self.original[vslice, :, :])
+        # sometimes divide by zero encountered in fitting
+        self.uvplane[self.uvplane == 0] = misc.min_abs(self.uvplane)
 
     def cutout_to_match_with(self, cube: DataCube) -> None:
         '''Cutout a region with the same size of the input ``cube``.
@@ -1508,6 +1524,7 @@ class GravLens:
                 assert isinstance((fname_y := data_or_fname_y), str)
                 loaded = cls.loadfits(fname_x, fname_y, index_hdul=index_hdul)
                 x_arcsec, y_arcsec = cls.convert_xy_pixel_to_arcsec(*loaded)
+                header = loaded[2]
                 return cls(x_arcsec, y_arcsec, header, *redshifts)
 
         elif (data_or_fname := data_or_fname_psi_arcsec) is not None:
@@ -1707,7 +1724,7 @@ class GravLens:
                 and y in arcsec.
 
         Examples:
-            >>> x_arcsec, y_arcsec = gl.convert_xy_pixel_to_arcsec(x_pix, y_pix)
+            >>> x_arcsec, y_arcsec = gl.convert_xy_pixel_to_arcsec(x_pix, y_pix, header)
 
         Nonte:
             Assumes that the units of "CDELT1" and "CDELT2" are degree.

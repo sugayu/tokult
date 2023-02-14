@@ -399,6 +399,7 @@ def construct_model_at_imageplane_with(
     xx_grid_image: np.ndarray,
     yy_grid_image: np.ndarray,
     vv_grid_image: np.ndarray,
+    cubeshape_imageplane: tuple[int, ...],
     lensing: Optional[Callable] = None,
     create_interpolate_lensing: Optional[Callable] = None,
     upsampling_rate: tuple[int, ...] = (1, 1, 1),
@@ -421,7 +422,14 @@ def construct_model_at_imageplane_with(
         else misc.no_lensing_interpolation
     )
 
-    keys_globals = ['xx_grid', 'yy_grid', 'vv_grid', 'lensing', 'lensing_interpolation']
+    keys_globals = [
+        'xx_grid',
+        'yy_grid',
+        'vv_grid',
+        'lensing',
+        'lensing_interpolation',
+        'cubeshape_imageplane',
+    ]
     _globals = {}
 
     for k in keys_globals:
@@ -943,6 +951,7 @@ def initialize_globalparameters_for_uv(
     size = datacube.original[0, :, :].size  # constant var needed for convolution
     cube = datacube.uvplane / beam_vis / size
     cube_error = np.sqrt(abs(beam_vis.real)) / beam_vis / np.sqrt(norm_weight) / size
+    cube_error[cube_error == 0] = cube_error.max()  # to prevent divide-by-zero
     cube_error = _correct_cube_error_for_uv(cube_error)
     cubeshape = datacube.original[datacube.vslice, :, :].shape
     cubeshape_imageplane = datacube.imageplane.shape
