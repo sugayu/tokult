@@ -413,8 +413,8 @@ def construct_model_at_imageplane_with(
             'Up-sampling in x and y has not yet been implemented. '
             'It performs fitting without up-sampling in x and y.'
         )
-    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
-    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
+    yy_grid = yy_grid_image[0][np.newaxis, :, :]
+    xx_grid = xx_grid_image[0][np.newaxis, :, :]
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     lensing_interpolation = (
         create_interpolate_lensing(xx_grid_image, yy_grid_image)
