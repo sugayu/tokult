@@ -17,7 +17,7 @@ def rms(
     '''Compute r.m.s.'''
     sumsq = np.nansum(cube**2, axis=axis)
     cube_zerofill = np.copy(cube)
-    cube_zerofill[~np.isfinite(cube)] = 0.0
+    cube_zerofill[not np.isfinite(cube)] = 0.0
     n = np.count_nonzero(cube_zerofill, axis=axis)
     return np.sqrt(sumsq / n)
 
