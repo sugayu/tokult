@@ -413,8 +413,8 @@ def construct_model_at_imageplane_with(
             'Up-sampling in x and y has not yet been implemented. '
             'It performs fitting without up-sampling in x and y.'
         )
-    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
-    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
+    yy_grid = yy_grid_image[0][np.newaxis, :, :]
+    xx_grid = xx_grid_image[0][np.newaxis, :, :]
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     lensing_interpolation = (
         create_interpolate_lensing(xx_grid_image, yy_grid_image)
@@ -877,7 +877,7 @@ def is_init_outside_of_bound(
     '''Return True if init is outside of bound.'''
     bound0, bound1 = bound
     for i, b0, b1 in zip(init, bound0, bound1):
-        if (i < b0) | (b1 < i):
+        if (i < b0) or (b1 < i):
             return True
     return False
 
@@ -917,13 +917,13 @@ def initialize_globalparameters_for_image(
     vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
     vv_grid = misc.gridding_upsample(vv_grid[:, 0, 0], upsampling_rate[0])
     vv_grid = vv_grid.reshape(-1, 1, 1)
-    if (upsampling_rate[1] > 1) | (upsampling_rate[2] > 1):
+    if (upsampling_rate[1] > 1) or (upsampling_rate[2] > 1):
         c.logger.warning(
             'Up-sampling in x and y has not yet been implemented. '
             'It performs fitting without up-sampling in x and y.'
         )
-    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
-    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
+    yy_grid = yy_grid_image[0][np.newaxis, :, :]
+    xx_grid = xx_grid_image[0][np.newaxis, :, :]
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
 
     lensing_interpolation = (
@@ -984,13 +984,13 @@ def initialize_globalparameters_for_uv(
     vv_grid, yy_grid_image, xx_grid_image = datacube.coord_imageplane
     vv_grid = misc.gridding_upsample(vv_grid[:, 0, 0], upsampling_rate[0])
     vv_grid = vv_grid.reshape(-1, 1, 1)
-    if (upsampling_rate[1] > 1) | (upsampling_rate[2] > 1):
+    if (upsampling_rate[1] > 1) or (upsampling_rate[2] > 1):
         c.logger.warning(
             'Up-sampling in x and y has not yet been implemented. '
             'It performs fitting without up-sampling in x and y.'
         )
-    yy_grid = yy_grid_image[0, :, 0].reshape(1, -1, 1)
-    xx_grid = xx_grid_image[0, 0, :].reshape(1, 1, -1)
+    yy_grid = yy_grid_image[0][np.newaxis, :, :]
+    xx_grid = xx_grid_image[0][np.newaxis, :, :]
     xx_grid, yy_grid = lensing(xx_grid, yy_grid)
     xslice, yslice = (datacube.xslice, datacube.yslice)
 
@@ -1261,7 +1261,7 @@ def initialize_globalparameters_for_moment(
     elif mom == 1:
         rms = datacube.rms_moment0()
         cube = datacube.pixmoment1(thresh=3 * rms)
-        idx = np.isfinite(cube) & mask.squeeze()
+        idx = np.isfinite(cube) and mask.squeeze()
         cube = cube[idx]  # cube becomes 1d
         mom0 = datacube.moment0()[idx]
         cube_error = 1 / np.sqrt(mom0)
