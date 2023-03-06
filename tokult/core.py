@@ -1635,6 +1635,41 @@ class GravLens:
         self.header_datacube = cube.header
         self.compute_deflection_angles()
 
+    def match_wcs_with_2d(self, image: np.ndarray, header: fits.Header) -> None:
+        '''Match the world coordinate system with an image.
+
+        Utility function to treat lensing maps for 2d images. Match the lens parameter
+        coordinates with the image coordinates through wcs.
+        Use the image wcs in an input header.
+
+        Args:
+            image (np.ndarray): 2d image.
+            header (fits.Header): Header of ``image``.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> gravlens.match_wcs_with(datacube)
+        '''
+        wcs_image = wcs.WCS(header)
+        wcs_gl = wcs.WCS(self.header)
+
+        size_y, size_x = image.shape
+        xarray = np.arange(0, size_x)
+        yarray = np.arange(0, size_y)
+        ygrid, xgrid = np.meshgrid(yarray, xarray, indexing='ij')
+        skycoord_wcs = wcs_image.pixel_to_world(xgrid.ravel(), ygrid.ravel())
+        xpixels, ypixels = wcs_gl.world_to_pixel(skycoord_wcs)
+
+        self.xaxis = np.mean(xpixels.reshape(xgrid.shape), axis=0)
+        self.yaxis = np.mean(ypixels.reshape(ygrid.shape), axis=1)
+        # self.xaxis = np.sort(np.unique(xpixels))
+        # self.yaxis = np.sort(np.unique(ypixels))
+        # self.shape = cube.xgrid.shape[1:]
+        self.header_datacube = header
+        self.compute_deflection_angles()
+
     def use_redshifts(
         self, z_source: float, z_lens: float, z_assumed: float = np.inf
     ) -> None:
