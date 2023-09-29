@@ -2,3 +2,23 @@
 
 * Tools for Kinematics on UV-plane for Lensed Targets
 This package provides functions to fit rotational disk models to ALMA data cube of lenzed galaxies.
+
+* Installation
+You can install Tokult from the github repository using ~pip~:
+#+begin_src bash
+  $ pip install git+https://github.com/sugayu/tokult.git@dev
+#+end_src
+Before using this command, it may be good to create a new Python environment for Tokult.
+
+To update the package, you may need to add the ~--upgrade~ option.
+#+begin_src bash
+  $ pip install --upgrade git+https://github.com/sugayu/tokult.git@dev
+#+end_src
+
+#+begin_note
+This command installs the program code from the branch "dev" (= development).
+We will remove ~@dev~ when the code is open to public.
+#+end_note
+
+* Documents
+See [[https://sugayu.github.io/tokult/]].

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to make mock noises? &mdash; tokult  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tokult" href="modules.html" />
+    <link rel="prev" title="Visualization" href="visualization.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            tokult
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="gettingstarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tips:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How to make mock noises?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#noise-added-mock-cubes-for-monte-carlo-fitting">Noise-added mock cubes for Monte Carlo fitting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#spatially-correlated-noise-maps">Spatially correlated noise maps</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">tokult</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tokult.html">tokult package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">tokult</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">How to make mock noises?</li>
+      <li class="wy-breadcrumbs-aside">
+              <!-- User defined GitHub URL -->
+              <a href="https://github.com/sugayu/tokult/tree/dev" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="how-to-make-mock-noises">
+<h1>How to make mock noises?<a class="headerlink" href="#how-to-make-mock-noises" title="Permalink to this heading"></a></h1>
+<section id="noise-added-mock-cubes-for-monte-carlo-fitting">
+<h2>Noise-added mock cubes for Monte Carlo fitting<a class="headerlink" href="#noise-added-mock-cubes-for-monte-carlo-fitting" title="Permalink to this heading"></a></h2>
+<p>Tokult can add spatially correlated noise maps to the observed data.
+These noise maps have the same rms with the observed data. Tokult
+internally uses these noise-added data cubes for the Monte Carlo fitting
+method on the image plane.</p>
+<div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">tokult</span> <span class="kn">import</span> <span class="n">Tokult</span>
+
+<span class="n">tok</span> <span class="o">=</span> <span class="n">Tokult</span><span class="o">.</span><span class="n">launch</span><span class="p">(</span><span class="s1">&#39;tokult_mockcube_dirty.fits&#39;</span><span class="p">,</span> <span class="s1">&#39;tokult_cube_dirty.psf.fits&#39;</span><span class="p">)</span>
+<span class="n">tok</span><span class="o">.</span><span class="n">use_region</span><span class="p">((</span><span class="mi">32</span><span class="p">,</span> <span class="mi">96</span><span class="p">),</span> <span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">96</span><span class="p">),</span> <span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">12</span><span class="p">))</span>
+
+<span class="n">cube_noise_added</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">perturbed</span><span class="p">(</span><span class="n">tok</span><span class="o">.</span><span class="n">dirtybeam</span><span class="o">.</span><span class="n">fullconvolve</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The lensing parameters are not needed only to produce mock noises. Let’s
+compare the created noise-added cubes with the original data.</p>
+<div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mf">6.28</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">6.28</span><span class="p">])</span>
+<span class="n">ax0</span><span class="p">,</span> <span class="n">ax1</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="n">ax0</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">imageplane</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:],</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cube_noise_added</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:],</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="results drawer docutils container">
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">AxesImage</span> <span class="n">at</span> <span class="mh">0x7f77deea62b0</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<img alt="_images/comparison_noiseadded_imageplane.png" src="_images/comparison_noiseadded_imageplane.png" />
+</div>
+<p>Note that the shape of <code class="docutils literal notranslate"><span class="pre">tok.datacube.imageplane</span></code> is (7, 64, 64), so
+<code class="docutils literal notranslate"><span class="pre">tok.datacube.imageplane[0,</span> <span class="pre">:,</span> <span class="pre">:]</span></code> contains the first channel map of
+the object.</p>
+</section>
+<section id="spatially-correlated-noise-maps">
+<h2>Spatially correlated noise maps<a class="headerlink" href="#spatially-correlated-noise-maps" title="Permalink to this heading"></a></h2>
+<p>Tokult can output the pure noise maps, with a bit long commands.</p>
+<div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">rms</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">rms</span><span class="p">(</span><span class="n">is_originalsize</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="o">...</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+<span class="n">noisecube</span> <span class="o">=</span> <span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">create_noise</span><span class="p">(</span><span class="n">rms</span><span class="p">,</span> <span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">original</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">tok</span><span class="o">.</span><span class="n">dirtybeam</span><span class="o">.</span><span class="n">fullconvolve</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Let’s compare again the created pure noise map with the original data.</p>
+<div class="highlight-ipython notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mf">6.28</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="mf">6.28</span><span class="p">])</span>
+<span class="n">ax0</span><span class="p">,</span> <span class="n">ax1</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+<span class="n">ax0</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">tok</span><span class="o">.</span><span class="n">datacube</span><span class="o">.</span><span class="n">original</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:],</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">)</span>
+<span class="n">ax1</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">noisecube</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:],</span> <span class="n">origin</span><span class="o">=</span><span class="s1">&#39;lower&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="results drawer docutils container">
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">image</span><span class="o">.</span><span class="n">AxesImage</span> <span class="n">at</span> <span class="mh">0x7f77ddc4fb80</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<img alt="_images/comparison_noises.png" src="_images/comparison_noises.png" />
+</div>
+<p>Since the noises of <code class="docutils literal notranslate"><span class="pre">tokult_mockcube_dirty.fits</span></code> is created using this
+method, the noise patterns looks really similar. Note that the shape of
+<code class="docutils literal notranslate"><span class="pre">tok.datacube.original</span></code> is (47, 128, 128), so
+<code class="docutils literal notranslate"><span class="pre">tok.datacube.original[0,</span> <span class="pre">:,</span> <span class="pre">:]</span></code> contains only a noise map without any
+objects.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="visualization.html" class="btn btn-neutral float-left" title="Visualization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modules.html" class="btn btn-neutral float-right" title="tokult" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, sugayu.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

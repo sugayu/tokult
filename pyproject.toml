@@ -1,2 +1,13 @@
 [tool.black]
 skip-string-normalization = true
+
+[tool.mypy]
+
+[[tool.mypy.overrides]]
+module = [
+       'scipy.*',
+       'astropy.*',
+       'emcee.*',
+       'tqdm'
+]
+ignore_missing_imports = true
