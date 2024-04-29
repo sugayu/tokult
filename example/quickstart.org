@@ -1,0 +1,66 @@
+#+title: Quick Start
+
+* Data Preparation
+TBD
+
+* Simple Example
+** Launching a Tokult instance
+#+begin_src ipython :session :exports both :async t :results raw drawer
+  import tokult
+  import datetime
+  import numpy as np
+  from astropy.io import fits
+
+  tok = tokult.Tokult.launch(
+      'cube_dirty.fits',
+      'cube_dirty.psf.fits',
+      ('gamma1.fits', 'gamma2.fits', 'kappa.fits'),
+  )
+#+end_src
+
+Then, specify a region of target galaxy for dynamical modeling.
+In addition, lensing parameters (gamma1.fits, gamma2.fits, and kappa.fits) need a correction using redshifts of the lensing cluster and the target object.
+Tokult can take these parameters with methods ~set_region~ and ~use_redshifts_of~.
+#+begin_src ipython :session :exports both :async t :results raw drawer
+  tok.set_region((226, 286), (226, 286), (5, 12))
+  tok.use_redshifts_of(z_lens=0.541, z_source=9.1111)
+#+end_src
+
+** /uv/-coverage
+The current code requires a resampled /uv/ coverage of the observations for fitting on the /uv/ plane.
+The /uv/ coverage can be obtained from  a dirty beam created with "uniform" weighting.
+#+begin_src ipython :session :exports both :async t :results raw drawer
+  hudl = fits.open('cube_dirty_uniform.psf.fits')
+  uvpsf_uniform = tokult.misc.rfft2(np.squeeze(hudl[0].data))
+  uvcoverage = (uvpsf_uniform[tok.datacube.vslice, :, :]) > 1.3e-5
+#+end_src
+Here, ~uvcoverage~ is a mask, ~np.ndarray~ including ~True~ or ~False~ at pixels; ~True~ indicates a pixel is used in fitting and vice versa.
+
+** Initial Parameters and Bounding
+Initial parameters starting MCMC can be specified on hand, or Tokult employs a method ~initialguess~ to estimate initial parameters from  moment-0 and 1 maps.
+Boundary information can be specified using ~tokult.get_bound_params~, if needed.
+
+#+begin_src ipython :session :exports both :async t :results raw drawer
+  init = tok.initialguess()
+  init = init._replace(mass_dyn=2.0)
+  bound = tokult.get_bound_params(
+      x0_dyn=(245, 265),
+      y0_dyn=(245, 265),
+      PA_dyn=(0, 2 * np.pi),
+      radius_dyn=(0.01, 5.0),
+      velocity_sys=(5, 12),
+      mass_dyn=(-2.0, 3.0),
+      velocity_dispersion=(0.1, 3.0),
+      brightness_center=(0.0, 1.0),
+  )
+#+end_src
+
+** Start fitting
+Fitting an example data takes ~1 hours with 4-core parallelization.
+#+begin_src ipython :session :exports both :async t :results raw drawer
+  sol = tok.uvfit(
+      init=init, bound=bound, mask_for_fit=uvcoverage, nprocesses=4, progressbar=True
+  )
+#+end_src
+
+* How to See Fitting Results
