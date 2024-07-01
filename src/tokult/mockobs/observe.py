@@ -1,0 +1,2 @@
+'''Mock observation pipeline.
+'''
