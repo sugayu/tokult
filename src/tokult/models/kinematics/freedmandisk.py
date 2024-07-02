@@ -28,8 +28,8 @@ class FreemanDiskParameters(FittingParametersBase):
 class FreemanDiskRotation(AbstractKinematics):
     '''Kinetic profile of Freeman disk'''
 
-    def __init__(self, coordinate_abs: np.ndarray) -> None:
-        super().__init__(coordinate_abs)
+    def __init__(self) -> None:
+        self.coord: np.ndarray
         self.p = FreemanDiskParameters()
 
     def output(self, _p: tuple[float, ...]) -> np.ndarray:

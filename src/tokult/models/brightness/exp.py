@@ -28,8 +28,8 @@ class ExponentialProfile(AbstractBrightness):
 
     cls_param = ExponentialProfileParameters
 
-    def __init__(self, coordinate_abs: np.ndarray) -> None:
-        super().__init__(coordinate_abs)
+    def __init__(self) -> None:
+        self.coord: np.ndarray
         self.p = ExponentialProfileParameters()
 
     def output(self, _p: tuple[float, ...]) -> np.ndarray:

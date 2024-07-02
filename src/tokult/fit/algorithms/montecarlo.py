@@ -1,14 +1,17 @@
 '''Estimate uncertainty by montecarlo resampling.
 '''
+
 from .optimize import Optimizer, SolutionDI
+
+
+__all__ = ['MonteCarlo']
 
 
 ##
 class MonteCarlo(Optimizer):
     ''' '''
 
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     def montecarlo(
         config: c.ConfigParameters,
@@ -84,8 +87,7 @@ class MonteCarlo(Optimizer):
 class MonteCarloDI(SolutionDI):
     ''' '''
 
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     def from_sampler(
         cls,

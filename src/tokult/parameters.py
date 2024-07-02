@@ -80,6 +80,10 @@ class CompleteFittingParameters:
     def ready(self) -> tuple[float, ...]:
         self.fixes = [p.fix for p in self.p]
 
+    @property
+    def initialparam(self) -> tuple[float, ...]:
+        return (0.0, 0.0)
+
     def restore_params(self, p: tuple[float, ...]) -> tuple[float]:
         '''Restore a parameter tuple with the complete length.
 

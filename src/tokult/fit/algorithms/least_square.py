@@ -1,14 +1,20 @@
 '''Least square fitting.
 '''
-from .optimize import Optimizer, SolutionDI
+
+from scipy.optimize import least_squares as sp_least_squares
+from scipy.optimize.optimize import OptimizeResult
+from ..optimize import Optimizer
+from ..solution import Solution
+
+
+__all__ = ['LeastSquare']
 
 
 ##
 class LeastSquare(Optimizer):
     ''' '''
 
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     def least_square(
         datacube: DataCube,
@@ -78,8 +84,7 @@ class LeastSquare(Optimizer):
 class LeastSquareDI(SolutionDI):
     ''' '''
 
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     def from_leastsquare(
         cls, output: OptimizeResult, chi2: float, dof: float

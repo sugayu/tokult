@@ -7,12 +7,15 @@ import numpy as np
 from ..parameters import FittingParametersBase
 
 
+__all__ = ['AbstractBrightness', 'AbstractKinematics', 'AbstractCubeBuilder']
+
+
 ##
 class AbstractBrightness(ABC):
     '''Abstract class to give surface brightness profiles.'''
 
-    def __init__(self, coordinate_abs: np.ndarray) -> None:
-        self.coord = coordinate_abs
+    def __init__(self) -> None:
+        self.coord: np.ndarray
         self.p: FittingParametersBase
 
     def __call__(self, p: tuple[float, ...]) -> np.ndarray:
@@ -27,8 +30,8 @@ class AbstractBrightness(ABC):
 class AbstractKinematics(ABC):
     '''Abstract class to give kinematics.'''
 
-    def __init__(self, coordinate_abs: np.ndarray) -> None:
-        self.coord = coordinate_abs
+    def __init__(self) -> None:
+        self.coord: np.ndarray
         self.p: FittingParametersBase
 
     def __call__(self, p: tuple[float, ...]) -> np.ndarray:
@@ -45,11 +48,10 @@ class AbstractCubeBuilder(ABC):
 
     def __init__(
         self,
-        coordinate_velocity: np.ndarray,
         kinematic_model: AbstractKinematics,
         brightness_model: AbstractBrightness,
     ) -> None:
-        self.coord = coordinate_velocity
+        self.coord: np.ndarray
         self._kinematic_model = kinematic_model
         self._brightness_model = brightness_model
         self.p: FittingParametersBase
@@ -57,17 +59,17 @@ class AbstractCubeBuilder(ABC):
     def __call__(
         self,
         p_kin: tuple[float, ...],
-        p_brght: tuple[float, ...],
-        p_bld: tuple[float, ...],
+        p_light: tuple[float, ...],
+        p_build: tuple[float, ...],
     ) -> np.ndarray:
-        return self.build(p_kin, p_brght, p_bld)
+        return self.build(p_kin, p_light, p_build)
 
     @abstractmethod
     def build(
         self,
         p_kin: tuple[float, ...],
-        p_brght: tuple[float, ...],
-        p_bld: tuple[float, ...],
+        p_light: tuple[float, ...],
+        p_build: tuple[float, ...],
     ) -> np.ndarray:
         '''Main method to build a model cube from full input parameters.'''
         ...

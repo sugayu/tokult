@@ -12,6 +12,10 @@ from ..abstract import (
     AbstractKinematics,
 )
 
+# for defaults
+from ..kinematics import FreemanDiskRotation
+from ..brightness import ExponentialProfile
+
 
 ##
 class ThinDiskParameters(FittingParametersBase):
@@ -23,26 +27,25 @@ class ThinDiskBuilder(AbstractCubeBuilder):
 
     def __init__(
         self,
-        coordinate_velocity: np.ndarray,
-        kinematic_model: AbstractKinematics,
-        brightness_model: AbstractBrightness,
+        kinematic_model: AbstractKinematics = FreemanDiskRotation(),
+        brightness_model: AbstractBrightness = ExponentialProfile(),
     ) -> None:
         super().__init__(
-            coordinate_velocity=coordinate_velocity,
             kinematic_model=kinematic_model,
             brightness_model=brightness_model,
         )
+        self.coordinate_velocity: np.ndarray
         self.p = ThinDiskParameters()
 
     def build(
         self,
         p_kin: tuple[float, ...],
-        p_brght: tuple[float, ...],
-        p_bld: tuple[float, ...],
+        p_light: tuple[float, ...],
+        p_build: tuple[float, ...],
     ) -> np.ndarray:
         velocity = self._kinematic_model.output(p_kin)
-        brightness = self._brightness_model.output(p_brght)
-        sigma = p_bld[0]
+        brightness = self._brightness_model.output(p_light)
+        sigma = p_build[0]
         model = function.gaussian(
             self.coord, center=velocity, sigma=sigma, area=brightness
         )
