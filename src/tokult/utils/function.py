@@ -5,7 +5,6 @@ Should be deleted.
 
 from __future__ import annotations
 import numpy as np
-import scipy.special as sps
 from typing import Union
 from numpy.typing import ArrayLike
 from astropy import units as u

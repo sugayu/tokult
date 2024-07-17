@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .models import AbstractCubeBuilder
     from .mockobs import MockTelescope
 
-__all__ = ['FittingParametersBase', 'FitPar']
+__all__ = ['FittingParametersBase', 'FitPar', 'ParameterManager']
 
 
 ##
@@ -477,76 +477,6 @@ class ParameterManager:
 #         '''Return input parameters with units.'''
 #         return FitParamsWithUnits.from_inputparams(self, header, redshift)
 
-
-# class InputParamsArray(NamedTuple):
-#     '''Input parameter array for construct_model_at_imageplane.'''
-
-#     x0_dyn: np.ndarray
-#     y0_dyn: np.ndarray
-#     PA_dyn: np.ndarray
-#     inclination_dyn: np.ndarray
-#     radius_dyn: np.ndarray
-#     velocity_sys: np.ndarray
-#     mass_dyn: np.ndarray
-#     brightness_center: np.ndarray
-#     velocity_dispersion: np.ndarray
-#     radius_emi: np.ndarray
-#     x0_emi: np.ndarray
-#     y0_emi: np.ndarray
-#     PA_emi: np.ndarray
-#     inclination_emi: np.ndarray
-
-#     def to_units(
-#         self, header: fits.Header, redshift: float = 0.0
-#     ) -> FitParamsWithUnits:
-#         '''Return input parameters with units.'''
-#         return FitParamsWithUnits.from_inputparams(self, header, redshift)
-
-#     @classmethod
-#     def from_ndarray(cls, params: np.ndarray):
-#         pass
-
-
-# def get_bound_fullparams(
-#     x0_dyn: tuple[float, float] = (-np.inf, np.inf),
-#     y0_dyn: tuple[float, float] = (-np.inf, np.inf),
-#     PA_dyn: tuple[float, float] = (0.0, 2 * np.pi),
-#     inclination_dyn: tuple[float, float] = (0.0, np.pi / 2),
-#     radius_dyn: tuple[float, float] = (0.0, np.inf),
-#     velocity_sys: tuple[float, float] = (-np.inf, np.inf),
-#     mass_dyn: tuple[float, float] = (-np.inf, np.inf),
-#     brightness_center: tuple[float, float] = (0.0, np.inf),
-#     velocity_dispersion: tuple[float, float] = (0.0, np.inf),
-#     radius_emi: tuple[float, float] = (0.0, np.inf),
-#     x0_emi: tuple[float, float] = (-np.inf, np.inf),
-#     y0_emi: tuple[float, float] = (-np.inf, np.inf),
-#     PA_emi: tuple[float, float] = (0.0, 2 * np.pi),
-#     inclination_emi: tuple[float, float] = (0.0, np.pi / 2),
-# ) -> tuple[InputParams, InputParams]:
-#     '''Return bound parameters.'''
-
-#     def _bound(i: int) -> InputParams:
-#         return InputParams(
-#             x0_dyn=x0_dyn[i],
-#             y0_dyn=y0_dyn[i],
-#             PA_dyn=PA_dyn[i],
-#             inclination_dyn=inclination_dyn[i],
-#             radius_dyn=radius_dyn[i],
-#             velocity_sys=velocity_sys[i],
-#             mass_dyn=mass_dyn[i],
-#             brightness_center=brightness_center[i],
-#             velocity_dispersion=velocity_dispersion[i],
-#             radius_emi=radius_emi[i],
-#             x0_emi=x0_emi[i],
-#             y0_emi=y0_emi[i],
-#             PA_emi=PA_emi[i],
-#             inclination_emi=inclination_emi[i],
-#         )
-
-#     lower, upper = (0, 1)
-#     return (_bound(lower), _bound(upper))
-
-
 # def is_init_outside_of_bound(
 #     init: tuple[float, ...], bound: tuple[tuple[float, ...], tuple[float, ...]]
 # ) -> bool:
@@ -556,89 +486,6 @@ class ParameterManager:
 #         if (i < b0) or (b1 < i):
 #             return True
 #     return False
-
-
-# class FixParams(NamedTuple):
-#     '''Fixed parameters for construct_model_at_imageplane.'''
-
-#     x0_dyn: Optional[float] = None
-#     y0_dyn: Optional[float] = None
-#     PA_dyn: Optional[float] = None
-#     inclination_dyn: Optional[float] = None
-#     radius_dyn: Optional[float] = None
-#     velocity_sys: Optional[float] = None
-#     mass_dyn: Optional[float] = None
-#     brightness_center: Optional[float] = None
-#     velocity_dispersion: Optional[float] = None
-#     radius_emi: Optional[Union[float, bool]] = None
-#     x0_emi: Optional[Union[float, bool]] = None
-#     y0_emi: Optional[Union[float, bool]] = None
-#     PA_emi: Optional[Union[float, bool]] = None
-#     inclination_emi: Optional[Union[float, bool]] = None
-
-
-# def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
-#     '''Set global parameters related with fixed parameters.
-
-#     if a value in fix is:
-#     - None: the parameter is not fixed
-#     - float: the perameter is fixed to the float value
-#     - True: the parameter has the same value as another parameter
-#     '''
-#     global parameters_preset, index_free, index_fixp_target, index_fixp_source
-#     parameters_preset = np.empty(14)
-#     index_free = []
-#     index_fixp_target = []
-#     index_fixp_source = []
-
-#     parameters_fixp = FixParams(
-#         radius_emi=4, x0_emi=0, y0_emi=1, PA_emi=2, inclination_emi=3
-#     )
-#     free_parameter = None
-#     fixed_to_another_parameter = True
-
-#     if (fix is None) and (is_separate):
-#         parameters_preset = None
-#         return
-#     elif fix is None:
-#         _fix = FixParams()
-#     else:
-#         _fix = fix
-
-#     if is_separate is False:
-#         _fix = _fix._replace(
-#             radius_emi=True, x0_emi=True, y0_emi=True, PA_emi=True, inclination_emi=True
-#         )
-
-#     for i, p in enumerate(_fix):
-#         p_is_fixed_to_a_value = isinstance(p, float)
-
-#         if p_is_fixed_to_a_value:
-#             parameters_preset[i] = p
-
-#         if p is free_parameter:
-#             index_free.append(i)
-
-#         if p is fixed_to_another_parameter:
-#             if (idx := parameters_fixp[i]) is None:
-#                 raise TypeError(
-#                     f'An unsupported parameter p[{i}] is set to True in FixParams.'
-#                 )
-#             index_fixp_target.append(i)
-#             index_fixp_source.append(int(idx))
-
-
-# def restore_fullparams(params: tuple[float, ...]) -> tuple[float, ...]:
-#     '''Restore parameters with pfix by inserting parameters into params.
-#     - params -- parameter array. Its length is shorter than 14, which is the
-#                 total number of parameters.
-#     '''
-#     global parameters_preset, index_free, index_fixp_target, index_fixp_source
-#     if (parameters_preset is None) or (len(params) == 14):
-#         return params
-#     parameters_preset[index_free] = params
-#     parameters_preset[index_fixp_target] = parameters_preset[index_fixp_source]
-#     return tuple(parameters_preset)
 
 
 # def shorten_init_and_bound_ifneeded(

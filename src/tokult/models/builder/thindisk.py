@@ -4,7 +4,7 @@
 import numpy as np
 import astropy.units as u
 
-from ... import function
+from ...utils import function
 from ...parameters import FitPar, FittingParametersBase
 from ..abstract import (
     AbstractCubeBuilder,

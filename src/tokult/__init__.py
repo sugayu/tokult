@@ -1,13 +1,12 @@
-'''Tokult --- Tools of Kinematics on UV-plane for Lensed Targets
+'''Tokult --- Tools of Kinematics Used for Lensed Targets
 
 Tokult is a kinematics fitting tool.
 '''
-from .__version import __version__
-from . import core
-from .core import *  # noqa
-from . import fitting
-from .fitting import *  # noqa
 
-__all__ = ['__version__', 'core', 'fitting']
-__all__ += core.__all__
-__all__ += fitting.__all__
+from .__version import __version__
+from .ui import Tokult
+from astropy.cosmology import FlatLambdaCDM
+
+cosmo = FlatLambdaCDM(H0=70, Om0=0.3, Ob0=0.04)
+
+__all__ = ['__version__', 'Tokult']

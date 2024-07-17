@@ -44,21 +44,21 @@ class Core:
         self.models = default.models if models is None else models
         self.telescope = default.telescope if telescope is None else telescope
         self.optimizer = default.optimizer if optimizer is None else optimizer
-        self.fullparams: ParameterManager
+        self.pmanager: ParameterManager
 
     def runfit(self) -> Solution:
-        self.ready_fittingparameters()
+        self.pmanager = self.standby_fittingparameters()
 
         self.optimizer.data = self.data
         self.optimizer.models = self.models
         self.optimizer.telescope = self.telescope
-        self.optimizer.fullparams = self.fullparams
+        self.optimizer.pmanager = self.pmanager
 
         sol = self.optimizer.optimize()
         return sol
 
-    def ready_fittingparameters(self) -> ParameterManager:
-        return ParameterManager()
+    def standby_fittingparameters(self) -> ParameterManager:
+        return ParameterManager(models=self.models, telescope=self.telescope)
 
 
 @dataclass

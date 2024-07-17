@@ -3,10 +3,11 @@
 The main reason why these are treated as global parameters is a reduction of
 data trafic in multiprocess.
 '''
-from typing import Callable, Optional
+
+from typing import Callable
 from dataclasses import dataclass
 import numpy as np
-from .. import misc
+from ..utils import dummy
 
 
 ##
@@ -25,19 +26,9 @@ class _FittedData:
     xslice: slice
     yslice: slice
     lensing: Callable = (
-        misc.no_lensing
+        dummy.no_lensing
     )  # a function to convert source plane to image plane. Method of GravLens.
-    lensing_interpolation: Callable = misc.no_lensing_interpolation
+    lensing_interpolation: Callable = dummy.no_lensing_interpolation
     convolve: Callable = (
-        misc.no_convolve
+        dummy.no_convolve
     )  # a function to convolve the input datacube. Method of DirtyBeam.
-
-
-@dataclass
-class _ParameterConfig:
-    '''Configuration to controle fitting parameters.'''
-
-    parameters_preset: Optional[np.ndarray]
-    index_free: list[int]
-    index_fixp_target: list[int]
-    index_fixp_source: list[int]
