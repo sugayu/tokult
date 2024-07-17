@@ -10,11 +10,13 @@ import numpy as np
 from astropy.nddata import NDData
 
 from .. import misc
-from ..parameters import CompleteFittingParameters
-from ..models import AbstractCubeBuilder
-from ..mockobs import MockTelescope
-from .fitparams import _FittedData, _ParameterConfig
-from .solution import Solution
+
+if TYPE_CHECKING:
+    from ..parameters import ParameterManager
+    from ..models import AbstractCubeBuilder
+    from ..mockobs import MockTelescope
+    from .fitparams import _FittedData, _ParameterConfig
+    from .solution import Solution
 
 # if TYPE_CHECKING:
 #     from .core import DataCube
@@ -29,10 +31,10 @@ class Optimizer(ABC):
     '''Abstract class to optimze cube models.'''
 
     def __init__(self) -> None:
-        self.fullparams: CompleteFittingParameters
-        self.model: AbstractCubeBuilder
-        self.telescope: MockTelescope
+        self.fullparams: ParameterManager
         self.data: NDData
+        self.models: AbstractCubeBuilder
+        self.telescope: MockTelescope
 
     @abstractmethod
     def optimize(self) -> Solution:

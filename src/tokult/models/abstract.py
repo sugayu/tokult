@@ -26,6 +26,14 @@ class AbstractBrightness(ABC):
         '''Return surface brightness profiles (depending on the positions).'''
         pass
 
+    @property
+    def modelname(self) -> str:
+        return self.p.modelname
+
+    @modelname.setter
+    def modelname(self, value: str) -> None:
+        self.p.modelname = value
+
 
 class AbstractKinematics(ABC):
     '''Abstract class to give kinematics.'''
@@ -42,6 +50,14 @@ class AbstractKinematics(ABC):
         '''Return velocity profiles depending on the positions.'''
         pass
 
+    @property
+    def modelname(self) -> str:
+        return self.p.modelname
+
+    @modelname.setter
+    def modelname(self, value: str) -> None:
+        self.p.modelname = value
+
 
 class AbstractCubeBuilder(ABC):
     '''Abstract class to build cube from brightness and kinematics models.'''
@@ -52,9 +68,9 @@ class AbstractCubeBuilder(ABC):
         brightness_model: AbstractBrightness,
     ) -> None:
         self.coord: np.ndarray
+        self.p: FittingParametersBase
         self._kinematic_model = kinematic_model
         self._brightness_model = brightness_model
-        self.p: FittingParametersBase
 
     def __call__(
         self,
@@ -73,3 +89,11 @@ class AbstractCubeBuilder(ABC):
     ) -> np.ndarray:
         '''Main method to build a model cube from full input parameters.'''
         ...
+
+    @property
+    def modelname(self) -> str:
+        return self.p.modelname
+
+    @modelname.setter
+    def modelname(self, value: str) -> None:
+        self.p.modelname = value

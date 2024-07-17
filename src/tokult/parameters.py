@@ -1,10 +1,25 @@
 '''Utilities to manipulate parameters.
 '''
 
-from typing import Type, NamedTuple, dataclass_transform
+from typing import (
+    Type,
+    NamedTuple,
+    dataclass_transform,
+    TYPE_CHECKING,
+    Any,
+    Self,
+)
+from itertools import accumulate
 from collections import namedtuple
-from dataclasses import dataclass, field, fields, is_dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field, is_dataclass
+from .utils.dataclass import fields, fieldnames
+import numpy as np
 import astropy.units as u
+
+if TYPE_CHECKING:
+    from .models import AbstractCubeBuilder
+    from .mockobs import MockTelescope
 
 __all__ = ['FittingParametersBase', 'FitPar']
 
@@ -30,10 +45,14 @@ class FittingParametersBase:
     All the fitting parameter class have to inherit this class.
     '''
 
+    modelname: str = ''
+
     def __new__(cls, *args, **kwargs):
         if not is_dataclass(cls):
-            dataclass(cls)  # Directly changes cls
-        return super().__new__(cls)
+            dataclass(cls, **kwargs)  # Directly changes cls
+        newclass = super().__new__(cls)
+        newclass.modelname = newclass.__class__.__name__
+        return newclass
 
     def namedtuplize(self, values: tuple):
         '''Name elements of a fitting parameter tuple.
@@ -52,7 +71,9 @@ class FittingParametersBase:
         '''
         clsname = self.__class__.__name__
         if not is_dataclass(self):
-            raise TypeError(f'namedtuplize of {clsname} cannot be used.')
+            raise TypeError(
+                f'namedtuplize of {clsname} cannot be used because it is not dataclass.'
+            )
 
         global CONTAINER_NAMEDTUPLE
         name = clsname + 'Tuple'
@@ -67,24 +88,162 @@ class FittingParametersBase:
         return namtpl(*values)
 
 
-class CompleteFittingParameters:
+class _DotDict(dict):
+    def __getattr__(self, key: str) -> Any:
+        return dict.__getitem__(self, key)
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        return dict.__setitem__(self, key, value)
+
+    def __delattr__(self, key: str) -> None:
+        return dict.__delitem__(self, key)
+
+
+class ParameterArray(np.ndarray):
+    '''Wrapper of numpy.ndarray to show parameters like attributes with dots.'''
+
+    def __new__(cls, array, paramkeys: _DotDict) -> Self:
+        obj = np.asarray(array).view(cls)
+        _nkeys1 = list(accumulate([len(k) for k in paramkeys.values()]))
+        _nkeys0 = [0] + _nkeys1[:-1]
+        _nkeys = [slice(n0, n1) for n0, n1 in zip(_nkeys0, _nkeys1)]
+        _keyslice = _DotDict(zip(paramkeys.keys(), _nkeys))
+        setattr(obj, '_keys', paramkeys)
+        setattr(obj, '_keyslice', _keyslice)
+        return obj
+
+    def __array_finalize__(self, obj) -> None:
+        if obj is None:
+            return
+        setattr(self, '_keys', getattr(obj, '_keys', None))
+        setattr(self, '_keyslice', getattr(obj, '_keyslice', None))
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return _DotDict(zip(self._keys[key], self[self._keyslice[key]]))
+        else:
+            return super().__getitem__(key)
+
+    __getattr__ = __getitem__
+
+
+class ParameterManager:
     '''Summary of all the fitting parameters.
 
     This class controles behaviour of all the fitting parameters for model building,
     mock observations, and fitting formulae.
     '''
 
-    def __init__(self) -> None:
-        self.parameters = None
+    def __init__(self, models: AbstractCubeBuilder, telescope: MockTelescope) -> None:
+        # Attributes
+        # As dict holds the order from Python 3.7, dict is used instead of OrderedDict.
+        self.parameters: dict[str, FittingParametersBase] = dict()
+        # self.nparams: list[int] = []
+        self.slices: list[slice] = []
 
-    def ready(self) -> tuple[float, ...]:
-        self.fixes = [p.fix for p in self.p]
+        self._index_free: np.ndarray = np.array([])
+
+        self._index_fix_float: np.ndarray | None
+        self._fixed_values: np.ndarray
+
+        self._index_fixp_from: np.ndarray | None
+        self._index_fixp_to: np.ndarray | None
+
+        self._index_func: np.ndarray | None
+        self._list_func: list[Callable]
+
+        self._fullparams: ParameterArray
+
+        self._paramkeys: _DotDict
+        self._paramindices: dict[str, dict[str, int]] = {}
+
+        # Initialize
+        self.register(models._kinematic_model)
+        self.register(models._brightness_model)
+        self.register(models)
+        self.register(telescope.components)
+
+        self.standby()
+
+    def standby(self) -> None:
+        '''Prepare attibutes and methods to manipulate parameters.'''
+        # Set paramkeys
+        self._paramkeys = _DotDict(
+            [(key, fieldnames(p)) for key, p in self.parameters.items()]
+        )
+
+        # Set slices and paramindices
+        # _nkeys1 = list(accumulate(self.nparams))
+        _nkeys1 = list(accumulate([len(_fields) for _, _fields in self._paramkeys]))
+        _nkeys0 = [0] + _nkeys1[:-1]
+        self.slices = [slice(n0, n1) for n0, n1 in zip(_nkeys0, _nkeys1)]
+        for (k, fp), n0 in zip(self._paramkeys, _nkeys0):
+            self._paramindices[k] = {p: n0 + i for i, p in enumerate(fp)}
+            _nmax = max(self._paramindices[k].values())
+
+        # Set attributes for .restore()
+        index_free = np.zeros(_nmax).astype(bool)
+        index_fix_float = np.zeros(_nmax).astype(bool)
+        fixed_values = []
+        index_fixp_from: list[int] = []
+        index_fixp_to = np.zeros(_nmax).astype(bool)
+        index_func = np.zeros(_nmax).astype(bool)
+        list_func: list[Callable] = []
+        for modelname, parambase in self.parameters.items():
+            for pname in fieldnames(parambase):
+                p: FitPar = getattr(parambase, pname)
+                i = self._paramindices[modelname][pname]
+
+                if p.fix is None:
+                    index_free[i] = True
+                if isinstance(p.fix, float):
+                    index_fix_float[i] = True
+                    fixed_values.append(p.fix)
+                if isinstance(p.fix, str):
+                    key0, key1 = p.fix.split('.')
+                    index_fixp_from.append(self._paramindices[key0][key1])
+                    index_fixp_to[i] = True
+                if callable(p.fix):
+                    index_func[i] = True
+                    list_func.append(p.fix)
+
+        self._index_free = np.asarray(index_free)
+        self._index_fix_float = np.asarray(index_fix_float)
+        self._fixed_values = np.asarray(fixed_values)
+        self._index_fixp_from = np.asarray(index_fixp_from)
+        self._index_fixp_to = np.asarray(index_fixp_to)
+        self._index_func = np.asarray(index_func)
+        self._list_func = list_func
+
+    def register(self, klass: object | list[object] | list[object | None]) -> None:
+        '''Add fitting parameters to internal dict to make the complete fit-par list.'''
+        if isinstance(klass, list):
+            for kls in klass:
+                if getattr(kls, 'p', None) is None:
+                    continue
+                self._register(kls)
+        else:
+            if getattr(klass, 'p', None) is None:
+                return
+            self._register(klass)
+
+    def _register(self, klass: object) -> None:
+        '''Work for method "register"'''
+        p = getattr(klass, 'p', None)
+        assert p is not None
+        if not isinstance(p, FittingParametersBase):
+            raise TypeError(
+                f'Input class {p.__class__.__name__} is not FittingParametersBase.'
+            )
+        name = p.modelname
+        self.parameters[name] = p
+        # self.nparams.append(len(fields(p)))
 
     @property
     def initialparam(self) -> tuple[float, ...]:
         return (0.0, 0.0)
 
-    def restore_params(self, p: tuple[float, ...]) -> tuple[float]:
+    def restore(self, short_parameters: tuple[float, ...]) -> tuple[float, ...]:
         '''Restore a parameter tuple with the complete length.
 
         The paraemter tuple is shortened in the fitting procedure, because some of the
@@ -97,362 +256,397 @@ class CompleteFittingParameters:
         Returns:
             tuple[float]: Complete parameters.
         '''
-        # XXX: TBD
-        global parameters_preset, index_free, index_fixp_target, index_fixp_source
-        if (parameters_preset is None) or (len(p) == 14):
-            return p
-        parameters_preset[index_free] = p
-        parameters_preset[index_fixp_target] = parameters_preset[index_fixp_source]
-        return list(parameters_preset)
+        expected_length = np.count_nonzero(self._index_free)
+        if len(short_parameters) != expected_length:
+            raise ValueError(
+                f'The length of the input parameters {len(short_parameters)} is '
+                f'different from the expected length {expected_length}.'
+            )
+        empty_array = np.full_like(self._index_free, None)
+        self._fullparams = ParameterArray(empty_array, paramkeys=self._paramkeys)
 
-    def pop_param(self, p: list[float]) -> tuple[float, ...]:
-        '''Pop out a decided length of params from the beggining.
+        # where are free parameters
+        self._fullparams[self._index_free] = short_parameters
+
+        # where are fixed values
+        if self._index_fix_float is not None:
+            self._fullparams[self._index_fix_float] = self._fixed_values
+
+        # where are tighted to other parameters
+        if self._index_fixp_to is not None:
+            self._fullparams[self._index_fixp_to] = self._fullparams[
+                self._index_fixp_from
+            ]
+
+        # where are computed in functions
+        if self._index_func is not None:
+            self._fullparams[self._index_func] = [
+                f(self._fullparams) for f in self._list_func
+            ]
+
+        if None in self._fullparams:
+            raise ValueError(
+                'Some of the fitting parameters are not well-defined, including None: '
+                f'{self._fullparams}'
+            )
+
+        return tuple(self._fullparams)
+
+    def shorten(self, full_parameters: tuple[float, ...]) -> tuple[float, ...]:
+        '''Shorten the full parameters to the "net" fitting parameters.
+
+        Here the "net" fitting parameters means parameters that are extracted from the
+        full_parameters by removing fixed or tighted parameters.
 
         Args:
-            p (list[float]): fitting parameters.
+            full_parameters (tuple[float, ...]): Parameter tuple, which has the same
+                length as all the parameters.
 
         Returns:
-            tuple[float, ...]: parameters used in the brightness model.
-
-        Note:
-            This method shorten (change) the input "p".
+            tuple[float, ...]: Shortened (net) fitting parameters.
         '''
-        if not isinstance(p, list):
-            raise Warning(
-                f'The input p must be list, but it has a different type of {type(p)}.'
-            )
-        _output = p[: self.psize]
-        del p[: self.psize]
-        return tuple(_output)
+        assert len(full_parameters) == len(self._index_free)
+        return tuple(np.array(full_parameters[self._index_free]))
 
-    def set_fitpars(self, p: FittingParametersBase) -> None:
-        '''Set fitting parameters.'''
-        self.p: FittingParametersBase = p
-        self.psize = len(fields(self.p))
+    def extract(
+        self, full_parameters: tuple[float, ...], name: str
+    ) -> tuple[float, ...]:
+        '''Extract parameters belonging to a specified model.
 
+        Args:
+            full_parameters (tuple[float, ...]): Parameter tuple, which has the same
+                length as all the parameters.
+            name (str): Model name.
 
-@dataclass
-class FitParamsWithUnits:
-    '''Fitting parameters with units.'''
-
-    x0_dyn: u.Quantity
-    y0_dyn: u.Quantity
-    PA_dyn: u.Quantity
-    inclination_dyn: u.Quantity
-    radius_dyn: u.Quantity
-    velocity_sys: u.Quantity
-    mass_dyn: u.Quantity
-    brightness_center: u.Quantity
-    velocity_dispersion: u.Quantity
-    radius_emi: u.Quantity
-    x0_emi: u.Quantity
-    y0_emi: u.Quantity
-    PA_emi: u.Quantity
-    inclination_emi: u.Quantity
-    header: Optional[fits.Header] = field(default=None, repr=False)
-    z: float = field(default=0.0, repr=False)
-    wcs: Optional[WCS] = field(init=False, repr=False)
-    pixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
-    freq_rest: Optional[u.Quantity] = field(init=False, repr=False)
-    vpixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
-    diskmassscale: Optional[u.Equivalency] = field(init=False, repr=False)
-
-    def __post_init__(self) -> None:
-        if self.header:
-            self.wcs = WCS(self.header)
-            self.freq_rest = self.header['RESTFRQ'] * u.Hz
-
-            deg_pix = abs(self.header['CDELT1']) * u.Unit(self.header['CUNIT1']) / u.pix
-            self.pixelscale = misc.pixel_scale(deg_pix.to(u.arcsec / u.pix), self.z)
-
-            dfreq_pix = abs(self.header['CDELT3']) * u.Unit(self.header['CUNIT3'])
-            opt_equiv = u.doppler_optical(self.freq_rest)
-            dv_pix = (self.freq_rest - dfreq_pix).to(u.km / u.s, opt_equiv)
-            self.vpixelscale = misc.vpixel_scale(dv_pix / u.pix)
-
-            self.diskmassscale = (
-                misc.diskmass_scale(self.pixelscale, self.vpixelscale)
-                if self.z > 0.0
-                else None
-            )
-
-        else:
-            self.wcs = None
-            self.pixelscale = None
-            self.freq_rest = None
-            self.vpixelscale = None
-            self.diskmassscale = None
-
-    def to_physicalscale(self) -> None:
-        '''Convert values to physicalscales.'''
-        if self.header is None:
-            raise ValueError('header is not input.')
-        assert isinstance(self.wcs, WCS)
-
-        wcs_celestial = self.wcs.celestial
-        wcs_spectral = self.wcs.spectral
-        coord_celestial = wcs_celestial.pixel_to_world(
-            [self.x0_dyn, self.x0_emi], [self.y0_dyn, self.y0_emi]
-        )
-        coord_spectral = wcs_spectral.pixel_to_world(self.velocity_sys)
-        coord_spectral_kms = coord_spectral.to(
-            u.km / u.s, doppler_convention='optical', doppler_rest=self.freq_rest
-        )
-        self.x0_dyn = coord_celestial.ra[0]
-        self.y0_dyn = coord_celestial.dec[0]
-        self.x0_emi = coord_celestial.ra[1]
-        self.y0_emi = coord_celestial.dec[1]
-        self.velocity_sys = coord_spectral_kms.quantity
-
-        self.radius_dyn = self.radius_dyn.to(u.arcsec, self.pixelscale)
-        self.radius_emi = self.radius_emi.to(u.arcsec, self.pixelscale)
-        self.brightness_center = self.brightness_center.to(
-            u.Jy / u.arcsec**2, self.pixelscale
-        )
-        self.velocity_dispersion = self.velocity_dispersion.to(
-            u.km / u.s, self.vpixelscale
-        )
-
-        if self.z > 0.0:
-            self.radius_dyn = self.radius_dyn.to(u.kpc, self.pixelscale)
-            self.radius_emi = self.radius_emi.to(u.kpc, self.pixelscale)
-            self.mass_dyn = self.mass_dyn.physical.to(u.Msun, self.diskmassscale)
-
-    def vmax(self):
-        '''Maximum rotation velcoity.'''
-        return func.maximum_rotation_velocity(self.mass_dyn, self.radius_dyn)
-
-    @classmethod
-    def from_inputparams(
-        cls,
-        inputparams: InputParams | InputParamsArray,
-        header: fits.Header | None = None,
-        z: float = 0.0,
-    ) -> FitParamsWithUnits:
-        '''Constructer from InputParams'''
-        dictionary = inputparams._asdict()
-        input_dict = {}
-        units = (
-            u.dimensionless_unscaled,
-            u.dimensionless_unscaled,
-            u.rad,
-            u.rad,
-            u.pix,
-            u.pix,
-            u.dex(u.pix**3),
-            u.Jy / u.pix / u.pix,
-            u.pix,
-            u.pix,
-            u.dimensionless_unscaled,
-            u.dimensionless_unscaled,
-            u.rad,
-            u.rad,
-        )
-        for (key, value), unit in zip(dictionary.items(), units):
-            input_dict[key] = value * unit
-
-        if header is None:
-            return cls(**input_dict)
-        else:
-            clsself = cls(header=header, z=z, **input_dict)
-            clsself.to_physicalscale()
-            return clsself
+        Returns:
+            tuple[float, ...]: Parameter tuple for the named model.
+        '''
+        index = list(self.parameters.keys()).index(name)
+        return full_parameters[self.slices[index]]
 
 
-class InputParams(NamedTuple):
-    '''Input parameters for construct_model_at_imageplane.'''
+# @dataclass
+# class FitParamsWithUnits:
+#     '''Fitting parameters with units.'''
 
-    x0_dyn: float  #: the coordinate on x-axis
-    y0_dyn: float
-    PA_dyn: float
-    inclination_dyn: float
-    radius_dyn: float
-    velocity_sys: float
-    mass_dyn: float
-    brightness_center: float
-    velocity_dispersion: float
-    radius_emi: float
-    x0_emi: float
-    y0_emi: float
-    PA_emi: float
-    inclination_emi: float
+#     x0_dyn: u.Quantity
+#     y0_dyn: u.Quantity
+#     PA_dyn: u.Quantity
+#     inclination_dyn: u.Quantity
+#     radius_dyn: u.Quantity
+#     velocity_sys: u.Quantity
+#     mass_dyn: u.Quantity
+#     brightness_center: u.Quantity
+#     velocity_dispersion: u.Quantity
+#     radius_emi: u.Quantity
+#     x0_emi: u.Quantity
+#     y0_emi: u.Quantity
+#     PA_emi: u.Quantity
+#     inclination_emi: u.Quantity
+#     header: Optional[fits.Header] = field(default=None, repr=False)
+#     z: float = field(default=0.0, repr=False)
+#     wcs: Optional[WCS] = field(init=False, repr=False)
+#     pixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
+#     freq_rest: Optional[u.Quantity] = field(init=False, repr=False)
+#     vpixelscale: Optional[u.Equivalency] = field(init=False, repr=False)
+#     diskmassscale: Optional[u.Equivalency] = field(init=False, repr=False)
 
-    def to_units(
-        self, header: fits.Header, redshift: float = 0.0
-    ) -> FitParamsWithUnits:
-        '''Return input parameters with units.'''
-        return FitParamsWithUnits.from_inputparams(self, header, redshift)
+#     def __post_init__(self) -> None:
+#         if self.header:
+#             self.wcs = WCS(self.header)
+#             self.freq_rest = self.header['RESTFRQ'] * u.Hz
 
+#             deg_pix = abs(self.header['CDELT1']) * u.Unit(self.header['CUNIT1']) / u.pix
+#             self.pixelscale = misc.pixel_scale(deg_pix.to(u.arcsec / u.pix), self.z)
 
-class InputParamsArray(NamedTuple):
-    '''Input parameter array for construct_model_at_imageplane.'''
+#             dfreq_pix = abs(self.header['CDELT3']) * u.Unit(self.header['CUNIT3'])
+#             opt_equiv = u.doppler_optical(self.freq_rest)
+#             dv_pix = (self.freq_rest - dfreq_pix).to(u.km / u.s, opt_equiv)
+#             self.vpixelscale = misc.vpixel_scale(dv_pix / u.pix)
 
-    x0_dyn: np.ndarray
-    y0_dyn: np.ndarray
-    PA_dyn: np.ndarray
-    inclination_dyn: np.ndarray
-    radius_dyn: np.ndarray
-    velocity_sys: np.ndarray
-    mass_dyn: np.ndarray
-    brightness_center: np.ndarray
-    velocity_dispersion: np.ndarray
-    radius_emi: np.ndarray
-    x0_emi: np.ndarray
-    y0_emi: np.ndarray
-    PA_emi: np.ndarray
-    inclination_emi: np.ndarray
+#             self.diskmassscale = (
+#                 misc.diskmass_scale(self.pixelscale, self.vpixelscale)
+#                 if self.z > 0.0
+#                 else None
+#             )
 
-    def to_units(
-        self, header: fits.Header, redshift: float = 0.0
-    ) -> FitParamsWithUnits:
-        '''Return input parameters with units.'''
-        return FitParamsWithUnits.from_inputparams(self, header, redshift)
+#         else:
+#             self.wcs = None
+#             self.pixelscale = None
+#             self.freq_rest = None
+#             self.vpixelscale = None
+#             self.diskmassscale = None
 
-    @classmethod
-    def from_ndarray(cls, params: np.ndarray):
-        pass
+#     def to_physicalscale(self) -> None:
+#         '''Convert values to physicalscales.'''
+#         if self.header is None:
+#             raise ValueError('header is not input.')
+#         assert isinstance(self.wcs, WCS)
 
+#         wcs_celestial = self.wcs.celestial
+#         wcs_spectral = self.wcs.spectral
+#         coord_celestial = wcs_celestial.pixel_to_world(
+#             [self.x0_dyn, self.x0_emi], [self.y0_dyn, self.y0_emi]
+#         )
+#         coord_spectral = wcs_spectral.pixel_to_world(self.velocity_sys)
+#         coord_spectral_kms = coord_spectral.to(
+#             u.km / u.s, doppler_convention='optical', doppler_rest=self.freq_rest
+#         )
+#         self.x0_dyn = coord_celestial.ra[0]
+#         self.y0_dyn = coord_celestial.dec[0]
+#         self.x0_emi = coord_celestial.ra[1]
+#         self.y0_emi = coord_celestial.dec[1]
+#         self.velocity_sys = coord_spectral_kms.quantity
 
-def get_bound_params(
-    x0_dyn: tuple[float, float] = (-np.inf, np.inf),
-    y0_dyn: tuple[float, float] = (-np.inf, np.inf),
-    PA_dyn: tuple[float, float] = (0.0, 2 * np.pi),
-    inclination_dyn: tuple[float, float] = (0.0, np.pi / 2),
-    radius_dyn: tuple[float, float] = (0.0, np.inf),
-    velocity_sys: tuple[float, float] = (-np.inf, np.inf),
-    mass_dyn: tuple[float, float] = (-np.inf, np.inf),
-    brightness_center: tuple[float, float] = (0.0, np.inf),
-    velocity_dispersion: tuple[float, float] = (0.0, np.inf),
-    radius_emi: tuple[float, float] = (0.0, np.inf),
-    x0_emi: tuple[float, float] = (-np.inf, np.inf),
-    y0_emi: tuple[float, float] = (-np.inf, np.inf),
-    PA_emi: tuple[float, float] = (0.0, 2 * np.pi),
-    inclination_emi: tuple[float, float] = (0.0, np.pi / 2),
-) -> tuple[InputParams, InputParams]:
-    '''Return bound parameters.'''
+#         self.radius_dyn = self.radius_dyn.to(u.arcsec, self.pixelscale)
+#         self.radius_emi = self.radius_emi.to(u.arcsec, self.pixelscale)
+#         self.brightness_center = self.brightness_center.to(
+#             u.Jy / u.arcsec**2, self.pixelscale
+#         )
+#         self.velocity_dispersion = self.velocity_dispersion.to(
+#             u.km / u.s, self.vpixelscale
+#         )
 
-    def _bound(i: int) -> InputParams:
-        return InputParams(
-            x0_dyn=x0_dyn[i],
-            y0_dyn=y0_dyn[i],
-            PA_dyn=PA_dyn[i],
-            inclination_dyn=inclination_dyn[i],
-            radius_dyn=radius_dyn[i],
-            velocity_sys=velocity_sys[i],
-            mass_dyn=mass_dyn[i],
-            brightness_center=brightness_center[i],
-            velocity_dispersion=velocity_dispersion[i],
-            radius_emi=radius_emi[i],
-            x0_emi=x0_emi[i],
-            y0_emi=y0_emi[i],
-            PA_emi=PA_emi[i],
-            inclination_emi=inclination_emi[i],
-        )
+#         if self.z > 0.0:
+#             self.radius_dyn = self.radius_dyn.to(u.kpc, self.pixelscale)
+#             self.radius_emi = self.radius_emi.to(u.kpc, self.pixelscale)
+#             self.mass_dyn = self.mass_dyn.physical.to(u.Msun, self.diskmassscale)
 
-    lower, upper = (0, 1)
-    return (_bound(lower), _bound(upper))
+#     def vmax(self):
+#         '''Maximum rotation velcoity.'''
+#         return func.maximum_rotation_velocity(self.mass_dyn, self.radius_dyn)
 
+#     @classmethod
+#     def from_inputparams(
+#         cls,
+#         inputparams: InputParams | InputParamsArray,
+#         header: fits.Header | None = None,
+#         z: float = 0.0,
+#     ) -> FitParamsWithUnits:
+#         '''Constructer from InputParams'''
+#         dictionary = inputparams._asdict()
+#         input_dict = {}
+#         units = (
+#             u.dimensionless_unscaled,
+#             u.dimensionless_unscaled,
+#             u.rad,
+#             u.rad,
+#             u.pix,
+#             u.pix,
+#             u.dex(u.pix**3),
+#             u.Jy / u.pix / u.pix,
+#             u.pix,
+#             u.pix,
+#             u.dimensionless_unscaled,
+#             u.dimensionless_unscaled,
+#             u.rad,
+#             u.rad,
+#         )
+#         for (key, value), unit in zip(dictionary.items(), units):
+#             input_dict[key] = value * unit
 
-def is_init_outside_of_bound(
-    init: tuple[float, ...], bound: tuple[tuple[float, ...], tuple[float, ...]]
-) -> bool:
-    '''Return True if init is outside of bound.'''
-    bound0, bound1 = bound
-    for i, b0, b1 in zip(init, bound0, bound1):
-        if (i < b0) or (b1 < i):
-            return True
-    return False
-
-
-class FixParams(NamedTuple):
-    '''Fixed parameters for construct_model_at_imageplane.'''
-
-    x0_dyn: Optional[float] = None
-    y0_dyn: Optional[float] = None
-    PA_dyn: Optional[float] = None
-    inclination_dyn: Optional[float] = None
-    radius_dyn: Optional[float] = None
-    velocity_sys: Optional[float] = None
-    mass_dyn: Optional[float] = None
-    brightness_center: Optional[float] = None
-    velocity_dispersion: Optional[float] = None
-    radius_emi: Optional[Union[float, bool]] = None
-    x0_emi: Optional[Union[float, bool]] = None
-    y0_emi: Optional[Union[float, bool]] = None
-    PA_emi: Optional[Union[float, bool]] = None
-    inclination_emi: Optional[Union[float, bool]] = None
-
-
-def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
-    '''Set global parameters related with fixed parameters.
-
-    if a value in fix is:
-    - None: the parameter is not fixed
-    - float: the perameter is fixed to the float value
-    - True: the parameter has the same value as another parameter
-    '''
-    global parameters_preset, index_free, index_fixp_target, index_fixp_source
-    parameters_preset = np.empty(14)
-    index_free = []
-    index_fixp_target = []
-    index_fixp_source = []
-
-    parameters_fixp = FixParams(
-        radius_emi=4, x0_emi=0, y0_emi=1, PA_emi=2, inclination_emi=3
-    )
-    free_parameter = None
-    fixed_to_another_parameter = True
-
-    if (fix is None) and (is_separate):
-        parameters_preset = None
-        return
-    elif fix is None:
-        _fix = FixParams()
-    else:
-        _fix = fix
-
-    if is_separate is False:
-        _fix = _fix._replace(
-            radius_emi=True, x0_emi=True, y0_emi=True, PA_emi=True, inclination_emi=True
-        )
-
-    for i, p in enumerate(_fix):
-        p_is_fixed_to_a_value = isinstance(p, float)
-
-        if p_is_fixed_to_a_value:
-            parameters_preset[i] = p
-
-        if p is free_parameter:
-            index_free.append(i)
-
-        if p is fixed_to_another_parameter:
-            if (idx := parameters_fixp[i]) is None:
-                raise TypeError(
-                    f'An unsupported parameter p[{i}] is set to True in FixParams.'
-                )
-            index_fixp_target.append(i)
-            index_fixp_source.append(int(idx))
+#         if header is None:
+#             return cls(**input_dict)
+#         else:
+#             clsself = cls(header=header, z=z, **input_dict)
+#             clsself.to_physicalscale()
+#             return clsself
 
 
-def restore_params(params: tuple[float, ...]) -> tuple[float, ...]:
-    '''Restore parameters with pfix by inserting parameters into params.
-    - params -- parameter array. Its length is shorter than 14, which is the
-                total number of parameters.
-    '''
-    global parameters_preset, index_free, index_fixp_target, index_fixp_source
-    if (parameters_preset is None) or (len(params) == 14):
-        return params
-    parameters_preset[index_free] = params
-    parameters_preset[index_fixp_target] = parameters_preset[index_fixp_source]
-    return tuple(parameters_preset)
+# class InputParams(NamedTuple):
+#     '''Input parameters for construct_model_at_imageplane.'''
+
+#     x0_dyn: float  #: the coordinate on x-axis
+#     y0_dyn: float
+#     PA_dyn: float
+#     inclination_dyn: float
+#     radius_dyn: float
+#     velocity_sys: float
+#     mass_dyn: float
+#     brightness_center: float
+#     velocity_dispersion: float
+#     radius_emi: float
+#     x0_emi: float
+#     y0_emi: float
+#     PA_emi: float
+#     inclination_emi: float
+
+#     def to_units(
+#         self, header: fits.Header, redshift: float = 0.0
+#     ) -> FitParamsWithUnits:
+#         '''Return input parameters with units.'''
+#         return FitParamsWithUnits.from_inputparams(self, header, redshift)
 
 
-def shorten_init_and_bound_ifneeded(
-    init: Sequence[float], bound: tuple[Sequence[float], Sequence[float]]
-) -> tuple[tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
-    '''Shorten init and bound parameter to match appropreate lengths.'''
-    global index_free
-    new_init = tuple(np.array(init)[index_free])
-    new_bound0 = tuple(np.array(bound[0])[index_free])
-    new_bound1 = tuple(np.array(bound[1])[index_free])
-    return new_init, (new_bound0, new_bound1)
+# class InputParamsArray(NamedTuple):
+#     '''Input parameter array for construct_model_at_imageplane.'''
+
+#     x0_dyn: np.ndarray
+#     y0_dyn: np.ndarray
+#     PA_dyn: np.ndarray
+#     inclination_dyn: np.ndarray
+#     radius_dyn: np.ndarray
+#     velocity_sys: np.ndarray
+#     mass_dyn: np.ndarray
+#     brightness_center: np.ndarray
+#     velocity_dispersion: np.ndarray
+#     radius_emi: np.ndarray
+#     x0_emi: np.ndarray
+#     y0_emi: np.ndarray
+#     PA_emi: np.ndarray
+#     inclination_emi: np.ndarray
+
+#     def to_units(
+#         self, header: fits.Header, redshift: float = 0.0
+#     ) -> FitParamsWithUnits:
+#         '''Return input parameters with units.'''
+#         return FitParamsWithUnits.from_inputparams(self, header, redshift)
+
+#     @classmethod
+#     def from_ndarray(cls, params: np.ndarray):
+#         pass
+
+
+# def get_bound_fullparams(
+#     x0_dyn: tuple[float, float] = (-np.inf, np.inf),
+#     y0_dyn: tuple[float, float] = (-np.inf, np.inf),
+#     PA_dyn: tuple[float, float] = (0.0, 2 * np.pi),
+#     inclination_dyn: tuple[float, float] = (0.0, np.pi / 2),
+#     radius_dyn: tuple[float, float] = (0.0, np.inf),
+#     velocity_sys: tuple[float, float] = (-np.inf, np.inf),
+#     mass_dyn: tuple[float, float] = (-np.inf, np.inf),
+#     brightness_center: tuple[float, float] = (0.0, np.inf),
+#     velocity_dispersion: tuple[float, float] = (0.0, np.inf),
+#     radius_emi: tuple[float, float] = (0.0, np.inf),
+#     x0_emi: tuple[float, float] = (-np.inf, np.inf),
+#     y0_emi: tuple[float, float] = (-np.inf, np.inf),
+#     PA_emi: tuple[float, float] = (0.0, 2 * np.pi),
+#     inclination_emi: tuple[float, float] = (0.0, np.pi / 2),
+# ) -> tuple[InputParams, InputParams]:
+#     '''Return bound parameters.'''
+
+#     def _bound(i: int) -> InputParams:
+#         return InputParams(
+#             x0_dyn=x0_dyn[i],
+#             y0_dyn=y0_dyn[i],
+#             PA_dyn=PA_dyn[i],
+#             inclination_dyn=inclination_dyn[i],
+#             radius_dyn=radius_dyn[i],
+#             velocity_sys=velocity_sys[i],
+#             mass_dyn=mass_dyn[i],
+#             brightness_center=brightness_center[i],
+#             velocity_dispersion=velocity_dispersion[i],
+#             radius_emi=radius_emi[i],
+#             x0_emi=x0_emi[i],
+#             y0_emi=y0_emi[i],
+#             PA_emi=PA_emi[i],
+#             inclination_emi=inclination_emi[i],
+#         )
+
+#     lower, upper = (0, 1)
+#     return (_bound(lower), _bound(upper))
+
+
+# def is_init_outside_of_bound(
+#     init: tuple[float, ...], bound: tuple[tuple[float, ...], tuple[float, ...]]
+# ) -> bool:
+#     '''Return True if init is outside of bound.'''
+#     bound0, bound1 = bound
+#     for i, b0, b1 in zip(init, bound0, bound1):
+#         if (i < b0) or (b1 < i):
+#             return True
+#     return False
+
+
+# class FixParams(NamedTuple):
+#     '''Fixed parameters for construct_model_at_imageplane.'''
+
+#     x0_dyn: Optional[float] = None
+#     y0_dyn: Optional[float] = None
+#     PA_dyn: Optional[float] = None
+#     inclination_dyn: Optional[float] = None
+#     radius_dyn: Optional[float] = None
+#     velocity_sys: Optional[float] = None
+#     mass_dyn: Optional[float] = None
+#     brightness_center: Optional[float] = None
+#     velocity_dispersion: Optional[float] = None
+#     radius_emi: Optional[Union[float, bool]] = None
+#     x0_emi: Optional[Union[float, bool]] = None
+#     y0_emi: Optional[Union[float, bool]] = None
+#     PA_emi: Optional[Union[float, bool]] = None
+#     inclination_emi: Optional[Union[float, bool]] = None
+
+
+# def set_fixedparameters(fix: Optional[FixParams], is_separate: bool) -> None:
+#     '''Set global parameters related with fixed parameters.
+
+#     if a value in fix is:
+#     - None: the parameter is not fixed
+#     - float: the perameter is fixed to the float value
+#     - True: the parameter has the same value as another parameter
+#     '''
+#     global parameters_preset, index_free, index_fixp_target, index_fixp_source
+#     parameters_preset = np.empty(14)
+#     index_free = []
+#     index_fixp_target = []
+#     index_fixp_source = []
+
+#     parameters_fixp = FixParams(
+#         radius_emi=4, x0_emi=0, y0_emi=1, PA_emi=2, inclination_emi=3
+#     )
+#     free_parameter = None
+#     fixed_to_another_parameter = True
+
+#     if (fix is None) and (is_separate):
+#         parameters_preset = None
+#         return
+#     elif fix is None:
+#         _fix = FixParams()
+#     else:
+#         _fix = fix
+
+#     if is_separate is False:
+#         _fix = _fix._replace(
+#             radius_emi=True, x0_emi=True, y0_emi=True, PA_emi=True, inclination_emi=True
+#         )
+
+#     for i, p in enumerate(_fix):
+#         p_is_fixed_to_a_value = isinstance(p, float)
+
+#         if p_is_fixed_to_a_value:
+#             parameters_preset[i] = p
+
+#         if p is free_parameter:
+#             index_free.append(i)
+
+#         if p is fixed_to_another_parameter:
+#             if (idx := parameters_fixp[i]) is None:
+#                 raise TypeError(
+#                     f'An unsupported parameter p[{i}] is set to True in FixParams.'
+#                 )
+#             index_fixp_target.append(i)
+#             index_fixp_source.append(int(idx))
+
+
+# def restore_fullparams(params: tuple[float, ...]) -> tuple[float, ...]:
+#     '''Restore parameters with pfix by inserting parameters into params.
+#     - params -- parameter array. Its length is shorter than 14, which is the
+#                 total number of parameters.
+#     '''
+#     global parameters_preset, index_free, index_fixp_target, index_fixp_source
+#     if (parameters_preset is None) or (len(params) == 14):
+#         return params
+#     parameters_preset[index_free] = params
+#     parameters_preset[index_fixp_target] = parameters_preset[index_fixp_source]
+#     return tuple(parameters_preset)
+
+
+# def shorten_init_and_bound_ifneeded(
+#     init: Sequence[float], bound: tuple[Sequence[float], Sequence[float]]
+# ) -> tuple[tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
+#     '''Shorten init and bound parameter to match appropreate lengths.'''
+#     global index_free
+#     new_init = tuple(np.array(init)[index_free])
+#     new_bound0 = tuple(np.array(bound[0])[index_free])
+#     new_bound1 = tuple(np.array(bound[1])[index_free])
+#     return new_init, (new_bound0, new_bound1)

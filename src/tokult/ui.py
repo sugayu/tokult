@@ -2,6 +2,7 @@
 '''
 
 from __future__ import annotations
+from logging import getLogger
 import numpy as np
 from astropy.io import fits
 from astropy.nddata import NDData
@@ -16,6 +17,7 @@ from .mockobs import MockTelescope
 from .core import Core
 
 __all__ = ['Tokult']
+logger = getLogger(__name__)
 
 
 ##
@@ -36,6 +38,14 @@ class Tokult:
     def runfit(self) -> Solution:
         '''Run fitting.'''
         return self.core.runfit()
+
+    @property
+    def data(self) -> NDData:
+        return self.core.data
+
+    @data.setter
+    def data(self, value: NDData) -> None:
+        self.core.data = value
 
 
 class OldTokult:
@@ -319,7 +329,7 @@ class OldTokult:
             norm_weight = self.calculate_normweight()
         else:
             msg = '"DirtyBeam" is necessary for uvfit.'
-            c.logger.error(msg)
+            logger.error(msg)
             raise ValueError(msg)
         func_lensing = self.gravlens.lensing if self.gravlens else None
         func_create_lensinginterp = (

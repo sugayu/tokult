@@ -2,7 +2,6 @@
 '''
 
 from __future__ import annotations
-from typing import Callable, Sequence
 import numpy as np
 import emcee
 from emcee.moves import DEMove, DESnookerMove
@@ -10,11 +9,11 @@ from ..optimize import Optimizer
 from ..solution import Solution
 
 
-__all__ = ['EmceeMCMC', 'McmcSolution']
+__all__ = ['EmceeMCMC', 'MCMCSolution']
 
 
 ##
-class McmcSolution(Solution):
+class MCMCSolution(Solution):
     ''' '''
 
     def __init__(self, sampler) -> None: ...
@@ -27,14 +26,21 @@ class McmcSolution(Solution):
 class EmceeMCMC(Optimizer):
     '''MCMC optimizer using emcee.'''
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        nwalkers: int = 64,
+        ndim: int = 0,
+        nsteps: int = 500,
+        moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)],
+    ) -> None:
         super().__init__()
         self.nwalkers: int
         self.ndim: int
         self.nsteps: int
         self.moves: list
 
-    def optimize(self) -> McmcSolution:
+    def optimize(self) -> MCMCSolution:
         sampler = emcee.EnsembleSampler(
             self.nwalkers,
             self.ndim,
@@ -45,18 +51,18 @@ class EmceeMCMC(Optimizer):
         )
         init = self.fullparams.initialparam
         sampler.run_mcmc(init, self.nsteps)
-        return McmcSolution(sampler)
+        return MCMCSolution(sampler)
 
-    def configure(
-        self, nwalkers: int, ndim: int, nsteps: int, moves: list | None = None
-    ) -> None:
-        self.nwalkers = nwalkers
-        self.ndim = ndim
-        self.nsteps = nsteps
-        if moves is None:
-            self.moves = [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
-        else:
-            self.moves = moves
+    # def configure(
+    #     self, nwalkers: int, ndim: int, nsteps: int, moves: list | None = None
+    # ) -> None:
+    #     self.nwalkers = nwalkers
+    #     self.ndim = ndim
+    #     self.nsteps = nsteps
+    #     if moves is None:
+    #         self.moves = [(DEMove(), 0.8), (DESnookerMove(), 0.2)]
+    #     else:
+    #         self.moves = moves
 
     def calculate_probability(self, params: tuple[float, ...]) -> float:
         '''Calcurate log probability.'''
