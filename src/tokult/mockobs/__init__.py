@@ -1,4 +1,3 @@
-'''Mock observation of the galaxy model to return an observed data cube.
-'''
+from .observation import MockObservation
 
-from .observe import MockTelescope
+__all__ = ['MockObservation']

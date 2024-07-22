@@ -1,1 +1,3 @@
-from .thindisk import ThinDiskBuilder
+from .simplebuilder import SimpleCubeBuilder
+
+__all__ = ['SimpleCubeBuilder']

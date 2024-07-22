@@ -9,7 +9,8 @@ from astropy.nddata import NDData
 if TYPE_CHECKING:
     from .fit import Solution, Optimizer
     from .models import AbstractCubeBuilder
-    from .mockobs import MockTelescope
+    from .mocktelescope import MockTelescope
+    from .mockobs import MockObservation
     from .core import Core
 
 __all__ = ['Tokult']
@@ -26,9 +27,14 @@ class Tokult:
         optimizer: Optimizer | None = None,
         models: AbstractCubeBuilder | None = None,
         telescope: MockTelescope | None = None,
+        observation: MockObservation | None = None,
     ) -> None:
         self.core = Core(
-            data=data, optimizer=optimizer, models=models, telescope=telescope
+            data=data,
+            optimizer=optimizer,
+            models=models,
+            telescope=telescope,
+            observation=observation,
         )
 
     def runfit(self) -> Solution:

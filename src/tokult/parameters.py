@@ -263,6 +263,7 @@ class ParameterManager:
                 f'different from the expected length {expected_length}.'
             )
         empty_array = np.full_like(self._index_free, None)
+        # TODO: This initialization of _fullparam might be skipped from the 2nd cycle.
         self._fullparams = ParameterArray(empty_array, paramkeys=self._paramkeys)
 
         # where are free parameters

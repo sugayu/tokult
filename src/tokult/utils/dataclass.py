@@ -7,7 +7,7 @@ from dataclasses import _FIELD, _FIELDS  # type: ignore
 
 ##
 def fields(data: object) -> tuple[dataclasses.Field, ...]:
-    '''Wrapper of fields to avoid unreasonable mypy error.'''
+    '''Wrapper of "fields" function to avoid unreasonable mypy error.'''
     try:
         fields = getattr(data, _FIELDS)
     except AttributeError:

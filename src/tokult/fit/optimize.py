@@ -12,8 +12,9 @@ from astropy.nddata import NDData
 if TYPE_CHECKING:
     from ..parameters import ParameterManager
     from ..models import AbstractCubeBuilder
-    from ..mockobs import MockTelescope
-    from .fitparams import _FittedData, _ParameterConfig
+    from ..mocktelescope import MockTelescope
+    from ..mockobs import MockObservation
+    from .fitparams import _FittedData
     from .solution import Solution
 
 # if TYPE_CHECKING:
@@ -21,7 +22,6 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 data: _FittedData
-paramconfig: _ParameterConfig
 
 
 ##
@@ -31,8 +31,7 @@ class Optimizer(ABC):
     def __init__(self) -> None:
         self.pmanager: ParameterManager
         self.data: NDData
-        self.models: AbstractCubeBuilder
-        self.telescope: MockTelescope
+        self.observation: MockObservation
 
     @abstractmethod
     def optimize(self) -> Solution:
@@ -56,15 +55,7 @@ class Optimizer(ABC):
 
     def modeling(self, p: tuple[float, ...]) -> np.ndarray:
         '''Give model data cube generated from the input parameters.'''
-        # TODO: How does it distribute parameters to models?
-        fullparam = self.pmanager.restore(p)
-        p_kin = self.pmanager.extract(fullparam, '')
-        p_emi = self.pmanager.extract(fullparam, '')
-        p_build = self.pmanager.extract(fullparam, '')
-        galaxy = self.models.build(p_kin, p_emi, p_build)
-        p_telescope = self.pmanager.extract(fullparam, '')
-        cube = self.telescope.observe(galaxy)
-        return cube
+        return self.observation(p)
 
 
 # def initialize_data(
