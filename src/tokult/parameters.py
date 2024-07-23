@@ -1,6 +1,7 @@
 '''Utilities to manipulate parameters.
 '''
 
+from __future__ import annotations
 from typing import (
     Type,
     NamedTuple,
@@ -13,13 +14,14 @@ from itertools import accumulate
 from collections import namedtuple
 from collections.abc import Callable
 from dataclasses import dataclass, field, is_dataclass
-from .utils.dataclass import fields, fieldnames
 import numpy as np
 import astropy.units as u
 
+from .utils.dataclass import fields, fieldnames
+
 if TYPE_CHECKING:
     from .models import AbstractCubeBuilder
-    from .mockobs import MockTelescope
+    from .mocktelescope import MockTelescope
 
 __all__ = ['FittingParametersBase', 'FitPar', 'ParameterManager']
 
@@ -49,6 +51,10 @@ class FittingParametersBase:
 
     def __new__(cls, *args, **kwargs):
         if not is_dataclass(cls):
+            for v in vars(cls):
+                if not isinstance(p := getattr(cls, v, None), FitPar):
+                    continue
+                setattr(cls, v, field(default_factory=lambda: p))
             dataclass(cls, **kwargs)  # Directly changes cls
         newclass = super().__new__(cls)
         newclass.modelname = newclass.__class__.__name__
@@ -158,8 +164,8 @@ class ParameterManager:
         self._paramindices: dict[str, dict[str, int]] = {}
 
         # Initialize
-        self.register(models._kinematic_model)
-        self.register(models._brightness_model)
+        self.register(models.galaxies._kinematic_model)
+        self.register(models.galaxies._brightness_model)
         self.register(models)
         self.register(telescope.components)
 

@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 from logging import getLogger
 from astropy.nddata import NDData
 
+from .core import Core
+
 if TYPE_CHECKING:
     from .fit import Solution, Optimizer
     from .models import AbstractCubeBuilder
     from .mocktelescope import MockTelescope
     from .mockobs import MockObservation
-    from .core import Core
 
 __all__ = ['Tokult']
 logger = getLogger(__name__)

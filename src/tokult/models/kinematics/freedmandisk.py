@@ -6,6 +6,7 @@
 import numpy as np
 import scipy.special as sps
 import astropy.units as u
+from dataclasses import field
 
 from ...parameters import FittingParametersBase, FitPar
 from ..abstract import AbstractKinematics

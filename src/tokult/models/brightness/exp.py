@@ -19,7 +19,7 @@ class ExponentialProfileParameters(FittingParametersBase):
     inclination: FitPar = FitPar(unit=u.rad, bound=(0.0, np.pi / 2), initial=1.0)
     radius: FitPar = FitPar(unit=u.pix, bound=(0.0, np.inf), initial=1.0)
     brightness_center: FitPar = FitPar(
-        unit=u.u.Jy / u.pix / u.pix, bound=(0.0, np.inf), initial=0.01
+        unit=u.Jy / u.pix / u.pix, bound=(0.0, np.inf), initial=0.01
     )
 
 
