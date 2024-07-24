@@ -9,20 +9,27 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 
+# for defaults
+from ..models.builder import SimpleCubeBuilder
+from ..mocktelescope import MockTelescope
+
 if TYPE_CHECKING:
     from ..parameters import ParameterManager
     from ..models import AbstractCubeBuilder
-    from ..mocktelescope import MockTelescope
 
 
 ##
 class MockObservation:
     '''Mock observation of a galaxy model using a mock telescope.'''
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        models: AbstractCubeBuilder = SimpleCubeBuilder(),
+        telescope=MockTelescope(),
+    ) -> None:
         self.pmanager: ParameterManager
-        self.models: AbstractCubeBuilder
-        self.telescope: MockTelescope
+        self.models = models
+        self.telescope = telescope
 
     def __call__(self, p: tuple[float, ...]) -> np.ndarray:
         return self.be_conducted(p)
@@ -32,9 +39,9 @@ class MockObservation:
         # TODO: How does it distribute parameters to models?
         fullparam = self.pmanager.restore(p)
 
-        name_kin = self.models.galaxies._kinematic_model.modelname
-        name_emi = self.models.galaxies._brightness_model.modelname
-        name_cube = self.models.galaxies.modelname
+        name_kin = self.models.galaxies.kinematic_model.name
+        name_emi = self.models.galaxies.brightness_model.name
+        name_cube = self.models.galaxies.name
 
         p_kin = self.pmanager.extract(fullparam, name_kin)
         p_emi = self.pmanager.extract(fullparam, name_emi)

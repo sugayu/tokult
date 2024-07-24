@@ -62,7 +62,7 @@ class Core:
         return sol
 
     def standby_fittingparameters(self) -> ParameterManager:
-        return ParameterManager(models=self.models, telescope=self.telescope)
+        return ParameterManager(mockobs=self.observation, optimizer=self.optimizer)
 
 
 @dataclass

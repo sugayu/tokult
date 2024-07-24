@@ -14,14 +14,15 @@ from itertools import accumulate
 from collections import namedtuple
 from collections.abc import Callable
 from dataclasses import dataclass, field, is_dataclass
+from copy import deepcopy
 import numpy as np
 import astropy.units as u
 
 from .utils.dataclass import fields, fieldnames
 
 if TYPE_CHECKING:
-    from .models import AbstractCubeBuilder
-    from .mocktelescope import MockTelescope
+    from .mockobs import MockObservation
+    from .fit import Optimizer
 
 __all__ = ['FittingParametersBase', 'FitPar', 'ParameterManager']
 
@@ -47,17 +48,22 @@ class FittingParametersBase:
     All the fitting parameter class have to inherit this class.
     '''
 
-    modelname: str = ''
+    name: str = ''
 
     def __new__(cls, *args, **kwargs):
         if not is_dataclass(cls):
             for v in vars(cls):
                 if not isinstance(p := getattr(cls, v, None), FitPar):
                     continue
-                setattr(cls, v, field(default_factory=lambda: p))
+                # The deepcopy below is necessary to send a value to dataclass.
+                # This may be because dataclass internally deletes default attributes to
+                # re-define them in __init__. Subsequently, the defined FitPar instances
+                # may be removed from the memory and default_factory returns None.
+                p0 = deepcopy(p)
+                setattr(cls, v, field(default_factory=lambda: deepcopy(p0)))
             dataclass(cls, **kwargs)  # Directly changes cls
         newclass = super().__new__(cls)
-        newclass.modelname = newclass.__class__.__name__
+        newclass.name = newclass.__class__.__name__
         return newclass
 
     def namedtuplize(self, values: tuple):
@@ -70,8 +76,8 @@ class FittingParametersBase:
 
         Examples:
             >>> class NewParameters(FittingParametersBase):
-            >>>     x0: Parameter(0)
-            >>>     y0: Parameter(1)
+            >>>     x0: FitPar: FitPar(...)
+            >>>     y0: FitPar: FitPar(...)
             >>> newp = NewParameters()
             >>> t = newp.namedtuplize((2, 3))
         '''
@@ -140,12 +146,12 @@ class ParameterManager:
     mock observations, and fitting formulae.
     '''
 
-    def __init__(self, models: AbstractCubeBuilder, telescope: MockTelescope) -> None:
+    def __init__(self, mockobs: MockObservation, optimizer: Optimizer) -> None:
         # Attributes
         # As dict holds the order from Python 3.7, dict is used instead of OrderedDict.
         self.parameters: dict[str, FittingParametersBase] = dict()
         # self.nparams: list[int] = []
-        self.slices: list[slice] = []
+        self._slices: list[slice] = []
 
         self._index_free: np.ndarray = np.array([])
 
@@ -164,10 +170,11 @@ class ParameterManager:
         self._paramindices: dict[str, dict[str, int]] = {}
 
         # Initialize
-        self.register(models.galaxies._kinematic_model)
-        self.register(models.galaxies._brightness_model)
-        self.register(models)
-        self.register(telescope.components)
+        self.register(mockobs.models.galaxies.kinematic_model)
+        self.register(mockobs.models.galaxies.brightness_model)
+        self.register(mockobs.models)
+        self.register(mockobs.telescope.components)
+        self.register(optimizer)
 
         self.standby()
 
@@ -180,12 +187,14 @@ class ParameterManager:
 
         # Set slices and paramindices
         # _nkeys1 = list(accumulate(self.nparams))
-        _nkeys1 = list(accumulate([len(_fields) for _, _fields in self._paramkeys]))
+        _nkeys1 = list(
+            accumulate([len(_fields) for _fields in self._paramkeys.values()])
+        )
         _nkeys0 = [0] + _nkeys1[:-1]
-        self.slices = [slice(n0, n1) for n0, n1 in zip(_nkeys0, _nkeys1)]
-        for (k, fp), n0 in zip(self._paramkeys, _nkeys0):
+        self._slices = [slice(n0, n1) for n0, n1 in zip(_nkeys0, _nkeys1)]
+        for (k, fp), n0 in zip(self._paramkeys.items(), _nkeys0):
             self._paramindices[k] = {p: n0 + i for i, p in enumerate(fp)}
-            _nmax = max(self._paramindices[k].values())
+            _nmax = max(self._paramindices[k].values()) + 1
 
         # Set attributes for .restore()
         index_free = np.zeros(_nmax).astype(bool)
@@ -195,10 +204,11 @@ class ParameterManager:
         index_fixp_to = np.zeros(_nmax).astype(bool)
         index_func = np.zeros(_nmax).astype(bool)
         list_func: list[Callable] = []
-        for modelname, parambase in self.parameters.items():
+        for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
+
                 p: FitPar = getattr(parambase, pname)
-                i = self._paramindices[modelname][pname]
+                i = self._paramindices[name][pname]
 
                 if p.fix is None:
                     index_free[i] = True
@@ -241,7 +251,7 @@ class ParameterManager:
             raise TypeError(
                 f'Input class {p.__class__.__name__} is not FittingParametersBase.'
             )
-        name = p.modelname
+        name = p.name
         self.parameters[name] = p
         # self.nparams.append(len(fields(p)))
 
@@ -329,7 +339,7 @@ class ParameterManager:
             tuple[float, ...]: Parameter tuple for the named model.
         '''
         index = list(self.parameters.keys()).index(name)
-        return full_parameters[self.slices[index]]
+        return full_parameters[self._slices[index]]
 
 
 # @dataclass

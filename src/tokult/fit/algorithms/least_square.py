@@ -2,7 +2,7 @@
 '''
 
 from scipy.optimize import least_squares as sp_least_squares
-from scipy.optimize.optimize import OptimizeResult
+from scipy.optimize import OptimizeResult
 from ..optimize import Optimizer
 from ..solution import Solution
 

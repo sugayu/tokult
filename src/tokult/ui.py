@@ -50,6 +50,22 @@ class Tokult:
     def data(self, value: NDData) -> None:
         self.core.data = value
 
+    @property
+    def optimizer(self) -> Optimizer:
+        return self.core.optimizer
+
+    @optimizer.setter
+    def optimizer(self, value: Optimizer) -> None:
+        self.core.optimizer = value
+
+    @property
+    def observation(self) -> MockObservation:
+        return self.core.observation
+
+    @observation.setter
+    def observation(self, value: MockObservation) -> None:
+        self.core.observation = value
+
 
 # import numpy as np
 # from astropy.io import fits

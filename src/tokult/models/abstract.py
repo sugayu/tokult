@@ -32,12 +32,12 @@ class AbstractBrightness(ABC):
         pass
 
     @property
-    def modelname(self) -> str:
-        return self.p.modelname
+    def name(self) -> str:
+        return self.p.name
 
-    @modelname.setter
-    def modelname(self, value: str) -> None:
-        self.p.modelname = value
+    @name.setter
+    def name(self, value: str) -> None:
+        self.p.name = value
 
 
 class AbstractKinematics(ABC):
@@ -56,12 +56,12 @@ class AbstractKinematics(ABC):
         pass
 
     @property
-    def modelname(self) -> str:
-        return self.p.modelname
+    def name(self) -> str:
+        return self.p.name
 
-    @modelname.setter
-    def modelname(self, value: str) -> None:
-        self.p.modelname = value
+    @name.setter
+    def name(self, value: str) -> None:
+        self.p.name = value
 
 
 class AbstractGalaxyCube(ABC):
@@ -74,8 +74,8 @@ class AbstractGalaxyCube(ABC):
     ) -> None:
         self.coord: np.ndarray
         self.p: FittingParametersBase
-        self._kinematic_model = kinematic_model
-        self._brightness_model = brightness_model
+        self.kinematic_model = kinematic_model
+        self.brightness_model = brightness_model
 
     def __call__(
         self,
@@ -96,12 +96,12 @@ class AbstractGalaxyCube(ABC):
         ...
 
     @property
-    def modelname(self) -> str:
-        return self.p.modelname
+    def name(self) -> str:
+        return self.p.name
 
-    @modelname.setter
-    def modelname(self, value: str) -> None:
-        self.p.modelname = value
+    @name.setter
+    def name(self, value: str) -> None:
+        self.p.name = value
 
 
 class AbstractCubeBuilder(ABC):
@@ -134,9 +134,9 @@ class AbstractCubeBuilder(ABC):
         ...
 
     @property
-    def modelname(self) -> str:
-        return self.p.modelname
+    def name(self) -> str:
+        return self.p.name
 
-    @modelname.setter
-    def modelname(self, value: str) -> None:
-        self.p.modelname = value
+    @name.setter
+    def name(self, value: str) -> None:
+        self.p.name = value

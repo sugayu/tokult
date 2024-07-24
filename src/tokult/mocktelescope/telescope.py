@@ -16,7 +16,7 @@ class MockTelescope:
     '''Telescope-like class to provide mock observations.'''
 
     def __init__(self) -> None:
-        self.components: list[TelescopeComponent]
+        self.components: list[TelescopeComponent] = []
 
     def observe(self, obj: np.ndarray) -> np.ndarray:
         '''Mock observation of the model object (image or cube).'''

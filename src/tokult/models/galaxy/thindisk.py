@@ -43,8 +43,8 @@ class ThinDisk(AbstractGalaxyCube):
         p_light: tuple[float, ...],
         p_cube: tuple[float, ...],
     ) -> np.ndarray:
-        velocity = self._kinematic_model.output(p_kin)
-        brightness = self._brightness_model.output(p_light)
+        velocity = self.kinematic_model.output(p_kin)
+        brightness = self.brightness_model.output(p_light)
         sigma = p_cube[0]
         cube = function.gaussian(
             self.coord, center=velocity, sigma=sigma, area=brightness
