@@ -150,21 +150,20 @@ class ParameterManager:
         # Attributes
         # As dict holds the order from Python 3.7, dict is used instead of OrderedDict.
         self.parameters: dict[str, FittingParametersBase] = dict()
+        self.nmax: int
         # self.nparams: list[int] = []
         self._slices: list[slice] = []
 
         self._index_free: np.ndarray = np.array([])
 
-        self._index_fix_float: np.ndarray | None
+        self._index_fix_float: np.ndarray
         self._fixed_values: np.ndarray
 
-        self._index_fixp_from: np.ndarray | None
-        self._index_fixp_to: np.ndarray | None
+        self._index_fixp_from: np.ndarray
+        self._index_fixp_to: np.ndarray
 
-        self._index_func: np.ndarray | None
+        self._index_func: np.ndarray
         self._list_func: list[Callable]
-
-        self._fullparams: ParameterArray
 
         self._paramkeys: _DotDict
         self._paramindices: dict[str, dict[str, int]] = {}
@@ -194,15 +193,15 @@ class ParameterManager:
         self._slices = [slice(n0, n1) for n0, n1 in zip(_nkeys0, _nkeys1)]
         for (k, fp), n0 in zip(self._paramkeys.items(), _nkeys0):
             self._paramindices[k] = {p: n0 + i for i, p in enumerate(fp)}
-            _nmax = max(self._paramindices[k].values()) + 1
+            self.nmax = max(self._paramindices[k].values()) + 1
 
         # Set attributes for .restore()
-        index_free = np.zeros(_nmax).astype(bool)
-        index_fix_float = np.zeros(_nmax).astype(bool)
+        index_free = np.zeros(self.nmax).astype(bool)
+        index_fix_float = np.zeros(self.nmax).astype(bool)
         fixed_values = []
         index_fixp_from: list[int] = []
-        index_fixp_to = np.zeros(_nmax).astype(bool)
-        index_func = np.zeros(_nmax).astype(bool)
+        index_fixp_to = np.zeros(self.nmax).astype(bool)
+        index_func = np.zeros(self.nmax).astype(bool)
         list_func: list[Callable] = []
         for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
@@ -272,42 +271,37 @@ class ParameterManager:
         Returns:
             tuple[float]: Complete parameters.
         '''
-        expected_length = np.count_nonzero(self._index_free)
-        if len(short_parameters) != expected_length:
+        if len(short_parameters) != self.nparams:
             raise ValueError(
                 f'The length of the input parameters {len(short_parameters)} is '
-                f'different from the expected length {expected_length}.'
+                f'different from the expected length {self.nparams}.'
             )
-        empty_array = np.full_like(self._index_free, None)
+        empty_array = np.full_like(self._index_free, np.nan, dtype=float)
         # TODO: This initialization of _fullparam might be skipped from the 2nd cycle.
-        self._fullparams = ParameterArray(empty_array, paramkeys=self._paramkeys)
+        fullparams = ParameterArray(empty_array, paramkeys=self._paramkeys)
 
         # where are free parameters
-        self._fullparams[self._index_free] = short_parameters
+        fullparams[self._index_free] = short_parameters
 
         # where are fixed values
-        if self._index_fix_float is not None:
-            self._fullparams[self._index_fix_float] = self._fixed_values
+        if np.any(self._index_fix_float):
+            fullparams[self._index_fix_float] = self._fixed_values
 
         # where are tighted to other parameters
-        if self._index_fixp_to is not None:
-            self._fullparams[self._index_fixp_to] = self._fullparams[
-                self._index_fixp_from
-            ]
+        if np.any(self._index_fixp_to):
+            fullparams[self._index_fixp_to] = fullparams[self._index_fixp_from]
 
         # where are computed in functions
-        if self._index_func is not None:
-            self._fullparams[self._index_func] = [
-                f(self._fullparams) for f in self._list_func
-            ]
+        if np.any(self._index_func):
+            fullparams[self._index_func] = [f(fullparams) for f in self._list_func]
 
-        if None in self._fullparams:
+        if np.any(np.isnan(fullparams)):
             raise ValueError(
                 'Some of the fitting parameters are not well-defined, including None: '
-                f'{self._fullparams}'
+                f'{fullparams}'
             )
 
-        return tuple(self._fullparams)
+        return tuple(fullparams)
 
     def shorten(self, full_parameters: tuple[float, ...]) -> tuple[float, ...]:
         '''Shorten the full parameters to the "net" fitting parameters.
@@ -322,8 +316,8 @@ class ParameterManager:
         Returns:
             tuple[float, ...]: Shortened (net) fitting parameters.
         '''
-        assert len(full_parameters) == len(self._index_free)
-        return tuple(np.array(full_parameters[self._index_free]))
+        assert len(full_parameters) == self.nmax
+        return tuple(np.array(full_parameters)[self._index_free])
 
     def extract(
         self, full_parameters: tuple[float, ...], name: str
@@ -340,6 +334,10 @@ class ParameterManager:
         '''
         index = list(self.parameters.keys()).index(name)
         return full_parameters[self._slices[index]]
+
+    @property
+    def nparams(self) -> int:
+        return np.count_nonzero(self._index_free)
 
 
 # @dataclass

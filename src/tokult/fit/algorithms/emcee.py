@@ -49,7 +49,7 @@ class EmceeMCMC(Optimizer):
             # pool=pool,
             moves=self.moves,
         )
-        init = self.fullparams.initialparam
+        init = self.pmanager.initialparam
         sampler.run_mcmc(init, self.nsteps)
         return MCMCSolution(sampler)
 
