@@ -30,15 +30,13 @@ class EmceeMCMC(Optimizer):
         self,
         *,
         nwalkers: int = 64,
-        ndim: int = 0,
         nsteps: int = 500,
         moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)],
     ) -> None:
         super().__init__()
-        self.nwalkers: int
-        self.ndim: int
-        self.nsteps: int
-        self.moves: list
+        self.nwalkers = nwalkers
+        self.nsteps = nsteps
+        self.moves = moves
 
     def optimize(self) -> MCMCSolution:
         sampler = emcee.EnsembleSampler(
@@ -49,7 +47,8 @@ class EmceeMCMC(Optimizer):
             # pool=pool,
             moves=self.moves,
         )
-        init = self.pmanager.initialparam
+        # it's a big confusing, but ndim=self.nwalkers is correct.
+        init = self.pmanager.initialvalues(seed=222, ndim=self.nwalkers)
         sampler.run_mcmc(init, self.nsteps)
         return MCMCSolution(sampler)
 
@@ -85,8 +84,12 @@ class EmceeMCMC(Optimizer):
         model = self.modeling(params)
         if self.data.mask is not None:
             model = model[self.data.mask]
-        chi = (self.data.data - model) / self.data.uncertainty
+        chi = (self.data.data - model) / self.data.uncertainty.array
         return -0.5 * np.sum(abs(chi.ravel()) ** 2)
+
+    @property
+    def ndim(self) -> int:
+        return self.pmanager.nparams
 
 
 #     def optimize(

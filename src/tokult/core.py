@@ -11,6 +11,7 @@ including Optimizer.
 '''
 
 from dataclasses import dataclass
+import numpy as np
 from astropy.nddata import NDData
 
 from .fit import Optimizer, Solution
@@ -21,7 +22,7 @@ from .parameters import ParameterManager
 
 # for defaults
 from .fit.algorithms import EmceeMCMC
-from .models.builder import SimpleCubeBuilder
+from .models.builder import SimpleSkyCubeBuilder
 
 __all__ = ['Core']
 
@@ -52,11 +53,21 @@ class Core:
     def runfit(self) -> Solution:
         self.pmanager = self.standby_fittingparameters()
 
+        assert len(self.data.data.shape) == 3
+        nv, ny, nx = self.data.data.shape
+        coord_yx = np.array(np.meshgrid(np.arange(ny), np.arange(nx)))
+        coord_yx = np.moveaxis(coord_yx, 0, -1)
+        self.observation.models.coord_yx = coord_yx
+        coord_v = np.arange(nv).reshape((nv, 1, 1))
+        self.observation.models.coord_velocity = coord_v
+
+        self.observation.pmanager = self.pmanager
+        self.optimizer.pmanager = self.pmanager
+
         self.observation.models = self.models
         self.observation.telescope = self.telescope
         self.optimizer.observation = self.observation
         self.optimizer.data = self.data
-        self.optimizer.pmanager = self.pmanager
 
         sol = self.optimizer.optimize()
         return sol
@@ -69,6 +80,6 @@ class Core:
 class Defaults:
     data: NDData = NDData([])
     optimizer: Optimizer = EmceeMCMC()
-    models: AbstractCubeBuilder = SimpleCubeBuilder()
+    models: AbstractCubeBuilder = SimpleSkyCubeBuilder()
     observation: MockObservation = MockObservation()
     telescope: MockTelescope = MockTelescope()

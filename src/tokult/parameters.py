@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, is_dataclass
 from copy import deepcopy
 import numpy as np
+from numpy.random import default_rng
 import astropy.units as u
 
 from .utils.dataclass import fields, fieldnames
@@ -167,11 +168,12 @@ class ParameterManager:
 
         self._paramkeys: _DotDict
         self._paramindices: dict[str, dict[str, int]] = {}
+        self._initialvalues: np.ndarray
 
         # Initialize
         self.register(mockobs.models.galaxies.kinematic_model)
         self.register(mockobs.models.galaxies.brightness_model)
-        self.register(mockobs.models)
+        self.register(mockobs.models.galaxies)
         self.register(mockobs.telescope.components)
         self.register(optimizer)
 
@@ -203,11 +205,17 @@ class ParameterManager:
         index_fixp_to = np.zeros(self.nmax).astype(bool)
         index_func = np.zeros(self.nmax).astype(bool)
         list_func: list[Callable] = []
+        initialvalues: list[float] = []
         for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
 
                 p: FitPar = getattr(parambase, pname)
                 i = self._paramindices[name][pname]
+
+                if p.initial is not None:
+                    initialvalues.append(p.initial)
+                else:
+                    initialvalues.append((p.bound[0] + p.bound[1]) / 2.0)
 
                 if p.fix is None:
                     index_free[i] = True
@@ -229,6 +237,7 @@ class ParameterManager:
         self._index_fixp_to = np.asarray(index_fixp_to)
         self._index_func = np.asarray(index_func)
         self._list_func = list_func
+        self._initialvalues = np.array(initialvalues)
 
     def register(self, klass: object | list[object] | list[object | None]) -> None:
         '''Add fitting parameters to internal dict to make the complete fit-par list.'''
@@ -254,9 +263,14 @@ class ParameterManager:
         self.parameters[name] = p
         # self.nparams.append(len(fields(p)))
 
-    @property
-    def initialparam(self) -> tuple[float, ...]:
-        return (0.0, 0.0)
+    def initialvalues(self, seed: int | None = None, ndim: int = 1) -> np.ndarray:
+        init = self._initialvalues[self._index_free]
+        if ndim != 1:
+            init = np.tile(init, (ndim, 1))
+        if seed is not None:
+            rng = default_rng(seed)
+            init += init * 1e-3 * rng.standard_normal(init.shape)
+        return init
 
     def restore(self, short_parameters: tuple[float, ...]) -> tuple[float, ...]:
         '''Restore a parameter tuple with the complete length.

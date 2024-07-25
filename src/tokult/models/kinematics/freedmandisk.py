@@ -6,7 +6,6 @@
 import numpy as np
 import scipy.special as sps
 import astropy.units as u
-from dataclasses import field
 
 from ...parameters import FittingParametersBase, FitPar
 from ..abstract import AbstractKinematics
@@ -14,29 +13,29 @@ from ..utils import coordinates as coord
 
 
 ##
+inf = np.inf
+
+
 class FreemanDiskParameters(FittingParametersBase):
-    x0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=0.0)
-    y0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=0.0)
+    x0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=0.0)
+    y0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=0.0)
     PA: FitPar = FitPar(unit=u.rad, bound=(0.0, 2 * np.pi), initial=3.0)
     inclination: FitPar = FitPar(unit=u.rad, bound=(0.0, np.pi / 2), initial=1.0)
-    radius: FitPar = FitPar(unit=u.pix, bound=(0.0, np.inf), initial=1.0)
-    velocity_sys: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=1.0)
-    mass_dyn: FitPar = FitPar(
-        unit=u.dex(u.pix**3), bound=(-np.inf, np.inf), initial=1.0
-    )
+    radius: FitPar = FitPar(unit=u.pix, bound=(0.0, inf), initial=1.0)
+    velocity_sys: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=1.0)
+    mass_dyn: FitPar = FitPar(unit=u.dex(u.pix**3), bound=(-inf, inf), initial=1.0)
 
 
 class FreemanDiskRotation(AbstractKinematics):
     '''Kinetic profile of Freeman disk'''
 
     def __init__(self) -> None:
-        self.coord: np.ndarray
         self.p = FreemanDiskParameters()
 
     def output(self, _p: tuple[float, ...]) -> np.ndarray:
         p = self.p.namedtuplize(_p)
-        coord_v = coord.to_relative_from(self.coord, at_x0=p.x0, at_y0=p.y0)
-        rr, pphi = coord.to_object_from(coord_v, PA=p.PA, incl=p.inclination)
+        coord_yx = coord.to_relative_from(self.coord_yx, at_x0=p.x0, at_y0=p.y0)
+        rr, pphi = coord.to_object_from(coord_yx, PA=p.PA, incl=p.inclination)
         velocity = p.velocity_sys + freemandisk(
             rr, pphi, mass_dyn=10.0**p.mass_dyn, rnorm=p.radius, incl=p.inclination
         )

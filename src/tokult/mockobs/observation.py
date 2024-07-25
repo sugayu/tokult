@@ -10,7 +10,7 @@ import numpy as np
 
 
 # for defaults
-from ..models.builder import SimpleCubeBuilder
+from ..models.builder import SimpleSkyCubeBuilder
 from ..mocktelescope import MockTelescope
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class MockObservation:
 
     def __init__(
         self,
-        models: AbstractCubeBuilder = SimpleCubeBuilder(),
+        models: AbstractCubeBuilder = SimpleSkyCubeBuilder(),
         telescope=MockTelescope(),
     ) -> None:
         self.pmanager: ParameterManager
@@ -36,18 +36,9 @@ class MockObservation:
 
     def be_conducted(self, p: tuple[float, ...]) -> np.ndarray:
         '''Give model data cube generated from the input parameters.'''
-        # TODO: How does it distribute parameters to models?
         fullparam = self.pmanager.restore(p)
-
-        name_kin = self.models.galaxies.kinematic_model.name
-        name_emi = self.models.galaxies.brightness_model.name
-        name_cube = self.models.galaxies.name
-
-        p_kin = self.pmanager.extract(fullparam, name_kin)
-        p_emi = self.pmanager.extract(fullparam, name_emi)
-        p_build = self.pmanager.extract(fullparam, name_cube)
-
-        galaxy = self.models.build(p_kin, p_emi, p_build)
+        self.models.pmanager = self.pmanager
+        galaxy = self.models.build(fullparam)
 
         # p_telescope = self.pmanager.extract(fullparam)
         cube = self.telescope.observe(galaxy)

@@ -1,3 +1,3 @@
-from .simplebuilder import SimpleCubeBuilder
+from .simplebuilder import SimpleSkyCubeBuilder
 
-__all__ = ['SimpleCubeBuilder']
+__all__ = ['SimpleSkyCubeBuilder']

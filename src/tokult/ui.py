@@ -48,6 +48,16 @@ class Tokult:
 
     @data.setter
     def data(self, value: NDData) -> None:
+        if not isinstance(value, NDData):
+            raise TypeError(
+                'The input has to be astropy.nddata.NDData, '
+                f'but currently {type(value)}.'
+            )
+        if value.uncertainty is None:
+            raise ValueError(
+                'The input does not have uncertainty information. '
+                'Please set a flux uncertainty in the input.'
+            )
         self.core.data = value
 
     @property

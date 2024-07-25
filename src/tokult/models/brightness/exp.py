@@ -34,9 +34,9 @@ class ExponentialProfile(AbstractBrightness):
 
     def output(self, _p: tuple[float, ...]) -> np.ndarray:
         p = self.p.namedtuplize(_p)
-        coord_i = coord.to_relative_from(self.coord, at_x0=p.x0, at_y0=p.y0)
-        rr_i, _ = coord.to_object_from(coord_i, PA=p.PA, incl=p.inclination)
-        return reciprocal_exp(rr_i, norm=p.brightness_center, rnorm=p.radius)
+        coord_yx = coord.to_relative_from(self.coord_yx, at_x0=p.x0, at_y0=p.y0)
+        rr, _ = coord.to_object_from(coord_yx, PA=p.PA, incl=p.inclination)
+        return reciprocal_exp(rr, norm=p.brightness_center, rnorm=p.radius)
 
 
 def reciprocal_exp(r: np.ndarray, norm: float, rnorm: float) -> np.ndarray:

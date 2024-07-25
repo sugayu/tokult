@@ -34,7 +34,7 @@ class ThinDisk(AbstractGalaxyCube):
             kinematic_model=kinematic_model,
             brightness_model=brightness_model,
         )
-        self.coordinate_velocity: np.ndarray
+        self.coord_velocity: np.ndarray
         self.p = ThinDiskParameters()
 
     def output(
@@ -47,6 +47,6 @@ class ThinDisk(AbstractGalaxyCube):
         brightness = self.brightness_model.output(p_light)
         sigma = p_cube[0]
         cube = function.gaussian(
-            self.coord, center=velocity, sigma=sigma, area=brightness
+            self.coord_velocity, center=velocity, sigma=sigma, area=brightness
         )
         return cube

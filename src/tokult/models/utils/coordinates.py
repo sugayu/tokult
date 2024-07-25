@@ -1,10 +1,14 @@
 '''Utilities to convert coordinates.
 '''
 
+from typing import Callable
 import numpy as np
 
 
 ##
+lensing_interpolation: Callable
+
+
 def to_object_from(
     coord_celestial: np.ndarray, PA: float, incl: float
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -23,9 +27,23 @@ def to_object_from(
 def to_relative_from(
     coord_source: np.ndarray, at_x0: float, at_y0: float
 ) -> np.ndarray:
-    '''Convert coordinates from absolute positions to relative positions.'''
+    '''Convert coordinates from absolute positions to relative positions.
+
+    Args:
+        coord_source (np.ndarray): Absolute coordinates. The expected shape is
+            (ny, nx, 2).
+        at_x0 (float): Central x position.
+        at_y0 (float): Central y position.
+
+    Returns:
+        np.ndarray: Coordinates relative to the galaxy center The expected
+            shape is (ny, nx, 2).
+    '''
     global lensing_interpolation
-    central_position = lensing_interpolation(at_x0, at_y0)
+    try:
+        central_position = lensing_interpolation(at_x0, at_y0)
+    except NameError:
+        central_position = np.array((at_x0, at_y0))
     return coord_source - central_position[np.newaxis, np.newaxis, :]
 
 

@@ -45,3 +45,8 @@ def test_ParameterManager():
     assert longparam[1:] == shortparam
     assert p_disk0[0] == 5.0
     assert len(p_disk0) == len(fields(mockobs.models.galaxies.kinematic_model.p))
+
+    init = pmanager.initialvalues()
+    assert len(init) == len(shortparam)
+    init = pmanager.initialvalues(ndim=3)
+    assert init.shape == (3, len(shortparam))
