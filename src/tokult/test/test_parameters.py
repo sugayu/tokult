@@ -16,7 +16,7 @@ def test_FittingParametersBase():
     p = TestParameters()
     assert isinstance(p.x, FitPar)
     assert p.x.initial == 1.0
-    p_ntuple = p.namedtuplize((3.0,))
+    p_ntuple = p.namedtuplize((3.0, 2.0))
     assert p_ntuple.x == 3.0
 
     original = p.x.initial

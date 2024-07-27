@@ -12,13 +12,25 @@ lensing_interpolation: Callable
 def to_object_from(
     coord_celestial: np.ndarray, PA: float, incl: float
 ) -> tuple[np.ndarray, np.ndarray]:
-    '''Convert coordinates from celestial coordinates to object polar coordinates.'''
+    '''Convert coordinates from celestial coordinates to object polar coordinates.
+
+    Args:
+        coord_celestial (np.ndarray): Celestial coordinates with shape of (ny, nx, 2).
+        PA (float): Position angle in a unit of radian.
+        incl (float): Inclination in a unit of radian.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Polar coordinates on the object.
+    '''
+
     pa = PA
     inclination = incl
 
     # coord_source = lensing(coord_image)
-    coord_object = rotate(coord_celestial, pa)
-    xx, yy = np.moveaxis(coord_object, -1, 0)
+
+    # The negative sign of -pa is to make the major axis to the x axis.
+    coord_object = rotate(coord_celestial, -pa)
+    yy, xx = np.moveaxis(coord_object, -1, 0)
     yy = yy / np.cos(inclination)
     r, phi = polar(xx, yy)
     return r, phi
@@ -43,16 +55,24 @@ def to_relative_from(
     try:
         central_position = lensing_interpolation(at_x0, at_y0)
     except NameError:
-        central_position = np.array((at_x0, at_y0))
+        central_position = np.array((at_y0, at_x0))
     return coord_source - central_position[np.newaxis, np.newaxis, :]
 
 
 def rotate(pos: np.ndarray, angle: float) -> np.ndarray:
-    '''Rotate (x,y) coordinates
-    Keyword Arguments:
-    pos -- position array. shape: (n, m, 2)
-    angle -- scalar; angle to rotate. radian
+    '''Anticlockwise rotatation of (y, x) coordinates.
+
+    It changes a coordinate of (y,x)=(0,1) into (1,0).
+
+    Args:
+        pos (np.ndarray): Positional array. Shape: (ny, nx, 2)
+        angle (float): Scalar; Angle [radian] to rotate.
+
+    Returns:
+        np.ndarray: Rotated coordinates. Shape: (ny, nx, 2)
     '''
+    assert len(pos.shape) == 3
+    assert pos.shape[2] == 2
     rot = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
     _pos = pos[..., np.newaxis]
     return np.squeeze(rot @ _pos, -1)

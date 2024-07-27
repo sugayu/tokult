@@ -4,6 +4,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from logging import getLogger
+import numpy as np
 from astropy.nddata import NDData
 
 from .core import Core
@@ -41,6 +42,10 @@ class Tokult:
     def runfit(self) -> Solution:
         '''Run fitting.'''
         return self.core.runfit()
+
+    def model(self, p: tuple[float]) -> np.ndarray:
+        '''Build a model.'''
+        return self.core.build_model(p)
 
     @property
     def data(self) -> NDData:

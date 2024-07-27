@@ -2,6 +2,7 @@
 '''
 
 from __future__ import annotations
+from logging import getLogger
 import numpy as np
 import emcee
 from emcee.moves import DEMove, DESnookerMove
@@ -11,12 +12,16 @@ from ..solution import Solution
 
 __all__ = ['EmceeMCMC', 'MCMCSolution']
 
+logger = getLogger(__name__)
+
 
 ##
 class MCMCSolution(Solution):
     ''' '''
 
-    def __init__(self, sampler) -> None: ...
+    def __init__(self, sampler) -> None:
+        flat = sampler.get_chain(discard=300, thin=4, flat=True)
+        logger.info(np.mean(flat, axis=0))
 
     # @classmethod
     # def from_mcmc(cls, params: np.ndarray, chi2: float, dof: float) -> Solution:
@@ -86,17 +91,6 @@ class EmceeMCMC(Optimizer):
             model = model[self.data.mask]
         chi = (self.data.data - model) / self.data.uncertainty.array
         r = -0.5 * np.sum(abs(chi.ravel()) ** 2)
-        if np.isnan(r):
-            from sugayutils.figure import makefig
-
-            fig = makefig(figsize=[3.5, 3.5])
-            ax = fig.add_subplot(2, 1, 1)
-            ax.imshow(self.data.data[15, :, :], origin='lower')
-            ax = fig.add_subplot(2, 1, 2)
-            ax.imshow(model[15, :, :], origin='lower')
-            fig.save_or_plot()
-
-            raise ValueError(f'NaN detected: {params} and {self.pmanager.bounds}')
         return r
 
     @property

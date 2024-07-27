@@ -23,11 +23,18 @@ class FreemanDiskParameters(FittingParametersBase):
     inclination: FitPar = FitPar(unit=u.rad, bound=(0.0, np.pi / 2), initial=1.0)
     radius: FitPar = FitPar(unit=u.pix, bound=(0.0, inf), initial=1.0)
     velocity_sys: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=1.0)
-    mass_dyn: FitPar = FitPar(unit=u.dex(u.pix**3), bound=(-inf, inf), initial=1.0)
+    mass_dyn: FitPar = FitPar(unit=u.dex(u.pix**3), bound=(-30, 30), initial=1.0)
 
 
 class FreemanDiskRotation(AbstractKinematics):
-    '''Kinetic profile of Freeman disk'''
+    '''Kinetic profile of Freeman disk
+
+    Note:
+        This function would return NaN if radius is much higher than the data size.
+        Other parameters including mass_dyn also have a risk to lead to NaN output
+        if their values are too large (or too small) comparing to canonical values.
+        Please appropreately specify reasonable boundaries when you use this function.
+    '''
 
     def __init__(self) -> None:
         self.p = FreemanDiskParameters()
@@ -65,6 +72,4 @@ def freemandisk(
     if np.any(idx := (A < 0)):
         A[idx] = 0.0
     f_sightline = np.cos(phi) * np.sin(incl)
-
-    velocity = r2h * np.sqrt(2 * myu_0_norm * A) * f_sightline
-    return velocity
+    return r2h * np.sqrt(2 * myu_0_norm * A) * f_sightline

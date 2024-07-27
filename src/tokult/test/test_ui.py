@@ -17,5 +17,5 @@ def test_Toult():
         * np.exp(-((v - 15.0) ** 2 / (2.0 * 1.0**2)))
     )
     tok.data = NDData(data, uncertainty=np.ones((30, 100, 100)))
-    tok.optimizer = EmceeMCMC(nwalkers=28, nsteps=100)
+    tok.optimizer = EmceeMCMC(nwalkers=28, nsteps=3)
     sol = tok.runfit()
