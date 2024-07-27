@@ -9,6 +9,7 @@ from ..utils.dataclass import fields
 ##
 class TestParameters(FittingParametersBase):
     x: FitPar = FitPar(unit=u.pix, bound=(0, np.inf), initial=1.0)
+    y: FitPar = FitPar(unit=u.pix, bound=(1.0, 10), initial=2.0)
 
 
 def test_FittingParametersBase():
@@ -31,8 +32,10 @@ def test_ParameterManager():
     mockobs = MockObservation()
     mockobs.models.galaxies.kinematic_model.name = 'disk0'
     mockobs.models.galaxies.kinematic_model.p.x0.fix = 5.0
+    mockobs.models.galaxies.kinematic_model.p.PA.initial = 2.0
     pmanager = ParameterManager(mockobs=mockobs, optimizer=EmceeMCMC())
     assert np.isinf(pmanager.parameters['disk0'].x0.bound[0])
+    assert pmanager.parameters['disk0'].PA.initial == 2.0
 
     longparam = tuple(np.arange(pmanager.nmax, dtype=float))
     shortparam = pmanager.shorten(longparam)
@@ -50,3 +53,5 @@ def test_ParameterManager():
     assert len(init) == len(shortparam)
     init = pmanager.initialvalues(ndim=3)
     assert init.shape == (3, len(shortparam))
+    init = pmanager.initialvalues(seed=222, ndim=3)
+    assert init[0, 0] != mockobs.models.galaxies.kinematic_model.p.y0.initial

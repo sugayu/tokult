@@ -126,15 +126,12 @@ class AbstractGalaxyCube(ABC):
 class AbstractCubeBuilder(ABC):
     '''Abstract class to build a sky cube model by combining galaxy cubes.'''
 
-    def __init__(
-        self,
-        galaxy_models: AbstractGalaxyCube,
-    ) -> None:
+    def __init__(self, galaxy_models: AbstractGalaxyCube) -> None:
         self.pmanager: ParameterManager
         self.coord_yx: np.ndarray
         self.coord_velocity: np.ndarray
         self.p: FittingParametersBase
-        self.galaxies = galaxy_models
+        self.galaxies: AbstractGalaxyCube = galaxy_models
 
     def __call__(self, p: tuple[float, ...]) -> np.ndarray:
         return self.build(p)

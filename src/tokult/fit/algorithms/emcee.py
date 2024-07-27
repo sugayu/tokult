@@ -73,11 +73,11 @@ class EmceeMCMC(Optimizer):
 
     def calculate_prior(self, params: tuple[float, ...]) -> float:
         '''Calcurate log prior of parameters.'''
-        # _params = np.array(params)
-        # bound0, bound1 = (np.array(bound[0]), np.array(bound[1]))
-        # if np.all(bound0 < _params) and np.all(_params < bound1):
-        return 0.0
-        # return -np.inf
+        _params = np.array(params)
+        bound0, bound1 = self.pmanager.bounds[0], self.pmanager.bounds[1]
+        if np.all(bound0 < _params) and np.all(_params < bound1):
+            return 0.0
+        return -np.inf
 
     def calculate_likelihood(self, params: tuple[float, ...]) -> float:
         '''Calcurate chi = (data-model)/error.'''
@@ -85,7 +85,19 @@ class EmceeMCMC(Optimizer):
         if self.data.mask is not None:
             model = model[self.data.mask]
         chi = (self.data.data - model) / self.data.uncertainty.array
-        return -0.5 * np.sum(abs(chi.ravel()) ** 2)
+        r = -0.5 * np.sum(abs(chi.ravel()) ** 2)
+        if np.isnan(r):
+            from sugayutils.figure import makefig
+
+            fig = makefig(figsize=[3.5, 3.5])
+            ax = fig.add_subplot(2, 1, 1)
+            ax.imshow(self.data.data[15, :, :], origin='lower')
+            ax = fig.add_subplot(2, 1, 2)
+            ax.imshow(model[15, :, :], origin='lower')
+            fig.save_or_plot()
+
+            raise ValueError(f'NaN detected: {params} and {self.pmanager.bounds}')
+        return r
 
     @property
     def ndim(self) -> int:

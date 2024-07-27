@@ -60,8 +60,8 @@ class FittingParametersBase:
                 # This may be because dataclass internally deletes default attributes to
                 # re-define them in __init__. Subsequently, the defined FitPar instances
                 # may be removed from the memory and default_factory returns None.
-                p0 = deepcopy(p)
-                setattr(cls, v, field(default_factory=lambda: deepcopy(p0)))
+                setattr(cls, v, field(default_factory=lambda p0=p: deepcopy(p0)))
+
             dataclass(cls, **kwargs)  # Directly changes cls
         newclass = super().__new__(cls)
         newclass.name = newclass.__class__.__name__
@@ -169,6 +169,7 @@ class ParameterManager:
         self._paramkeys: _DotDict
         self._paramindices: dict[str, dict[str, int]] = {}
         self._initialvalues: np.ndarray
+        self.bounds: np.ndarray
 
         # Initialize
         self.register(mockobs.models.galaxies.kinematic_model)
@@ -206,6 +207,7 @@ class ParameterManager:
         index_func = np.zeros(self.nmax).astype(bool)
         list_func: list[Callable] = []
         initialvalues: list[float] = []
+        bounds: list[tuple[float, float]] = []
         for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
 
@@ -216,6 +218,8 @@ class ParameterManager:
                     initialvalues.append(p.initial)
                 else:
                     initialvalues.append((p.bound[0] + p.bound[1]) / 2.0)
+
+                bounds.append(p.bound)
 
                 if p.fix is None:
                     index_free[i] = True
@@ -238,6 +242,7 @@ class ParameterManager:
         self._index_func = np.asarray(index_func)
         self._list_func = list_func
         self._initialvalues = np.array(initialvalues)
+        self.bounds = np.array(bounds).T[:, self._index_free]
 
     def register(self, klass: object | list[object] | list[object | None]) -> None:
         '''Add fitting parameters to internal dict to make the complete fit-par list.'''
@@ -269,7 +274,9 @@ class ParameterManager:
             init = np.tile(init, (ndim, 1))
         if seed is not None:
             rng = default_rng(seed)
-            init += init * 1e-3 * rng.standard_normal(init.shape)
+            fluctuation = 1e-3 * rng.standard_normal(init.shape)
+            init += init * fluctuation
+            init[init == 0.0] += fluctuation[init == 0.0]
         return init
 
     def restore(self, short_parameters: tuple[float, ...]) -> tuple[float, ...]:
