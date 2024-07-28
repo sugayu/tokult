@@ -31,7 +31,7 @@ class Tokult:
         telescope: MockTelescope | None = None,
         observation: MockObservation | None = None,
     ) -> None:
-        self.core = Core(
+        self._core = Core(
             data=data,
             optimizer=optimizer,
             models=models,
@@ -41,15 +41,15 @@ class Tokult:
 
     def runfit(self, initial: np.ndarray | None = None) -> Solution:
         '''Run fitting.'''
-        return self.core.runfit(initial=initial)
+        return self._core.runfit(initial=initial)
 
     def model(self, p: tuple[float]) -> np.ndarray:
         '''Build a model.'''
-        return self.core.build_model(p)
+        return self._core.build_model(p)
 
     @property
     def data(self) -> NDData:
-        return self.core.data
+        return self._core.data
 
     @data.setter
     def data(self, value: NDData) -> None:
@@ -63,23 +63,23 @@ class Tokult:
                 'The input does not have uncertainty information. '
                 'Please set a flux uncertainty in the input.'
             )
-        self.core.data = value
+        self._core.data = value
 
     @property
     def optimizer(self) -> Optimizer:
-        return self.core.optimizer
+        return self._core.optimizer
 
     @optimizer.setter
     def optimizer(self, value: Optimizer) -> None:
-        self.core.optimizer = value
+        self._core.optimizer = value
 
     @property
     def observation(self) -> MockObservation:
-        return self.core.observation
+        return self._core.observation
 
     @observation.setter
     def observation(self, value: MockObservation) -> None:
-        self.core.observation = value
+        self._core.observation = value
 
 
 # import numpy as np
@@ -116,7 +116,7 @@ class Tokult:
 #         self.gravlens = gravlens
 #         self.modelcube: Optional[ModelCube] = None
 #         self.config = c.ConfigParameters()
-#         self.core = Core()
+#         self._core = Core()
 
 #     @classmethod
 #     def launch(

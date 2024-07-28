@@ -362,6 +362,34 @@ class ParameterManager:
     def nparams(self) -> int:
         return np.count_nonzero(self._index_free)
 
+    def within_boundaries(self, p: tuple[float, ...] | np.ndarray) -> bool:
+        '''Check whether input parameters are inside the boundaries.'''
+        _params = np.asarray(p)
+        bound0, bound1 = self.bounds[0], self.bounds[1]
+        return bool(np.all(bound0 < _params) and np.all(_params < bound1))
+
+    def outside_boundaries(self, p: tuple[float, ...] | np.ndarray) -> bool:
+        '''Check whether input parameters are outside the boundaries.'''
+        return not self.within_boundaries(p)
+
+    def warn_if_outside_boundaries(self, p: tuple[float, ...] | np.ndarray) -> None:
+        '''Raise warning if input parameters are outside the boundaries.'''
+        if self.within_boundaries(p):
+            return
+
+        b0, b1 = self.bounds[0], self.bounds[1]
+        idx0 = np.where(b0 > p)[0]
+        idx1 = np.where(p > b1)[0]
+        str0, str1 = 'lower boundaries are OK.', 'uppwer boundaries are OK.'
+        if idx0:
+            str0 = f'index {idx0} ({p[idx0]}) is less than lower bound ({b0[idx0]})'
+        if idx1:
+            str1 = f'index {idx1} ({p[idx1]}) is higher than upper bound ({b1[idx1]})'
+        raise ValueError(
+            'Initial parameters are outside of boundaries:\n'
+            f'Init={p}; {str0}; {str1}'
+        )
+
 
 # @dataclass
 # class FitParamsWithUnits:
@@ -514,24 +542,3 @@ class ParameterManager:
 #     ) -> FitParamsWithUnits:
 #         '''Return input parameters with units.'''
 #         return FitParamsWithUnits.from_inputparams(self, header, redshift)
-
-# def is_init_outside_of_bound(
-#     init: tuple[float, ...], bound: tuple[tuple[float, ...], tuple[float, ...]]
-# ) -> bool:
-#     '''Return True if init is outside of bound.'''
-#     bound0, bound1 = bound
-#     for i, b0, b1 in zip(init, bound0, bound1):
-#         if (i < b0) or (b1 < i):
-#             return True
-#     return False
-
-
-# def shorten_init_and_bound_ifneeded(
-#     init: Sequence[float], bound: tuple[Sequence[float], Sequence[float]]
-# ) -> tuple[tuple[float, ...], tuple[tuple[float, ...], tuple[float, ...]]]:
-#     '''Shorten init and bound parameter to match appropreate lengths.'''
-#     global index_free
-#     new_init = tuple(np.array(init)[index_free])
-#     new_bound0 = tuple(np.array(bound[0])[index_free])
-#     new_bound1 = tuple(np.array(bound[1])[index_free])
-#     return new_init, (new_bound0, new_bound1)

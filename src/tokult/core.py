@@ -54,11 +54,8 @@ class Core:
         self.pmanager = self.standby_fittingparameters()
 
         assert len(self.data.data.shape) == 3
-        nv, ny, nx = self.data.data.shape
-        coord_yx = np.array(np.meshgrid(np.arange(ny), np.arange(nx), indexing='ij'))
-        coord_yx = np.moveaxis(coord_yx, 0, -1)
+        coord_yx, coord_v = self.get_3Dpositiongrids()
         self.observation.models.coord_yx = coord_yx
-        coord_v = np.arange(nv).reshape((nv, 1, 1))
         self.observation.models.coord_velocity = coord_v
 
         self.observation.pmanager = self.pmanager
@@ -74,15 +71,11 @@ class Core:
 
     def build_model(self, p: tuple[float]) -> np.ndarray:
         self.pmanager = self.standby_fittingparameters()
-        nv, ny, nx = self.data.data.shape
-        coord_yx = np.array(np.meshgrid(np.arange(ny), np.arange(nx), indexing='ij'))
-        coord_yx = np.moveaxis(coord_yx, 0, -1)
+        coord_yx, coord_v = self.get_3Dpositiongrids()
         self.observation.models.coord_yx = coord_yx
-        coord_v = np.arange(nv).reshape((nv, 1, 1))
         self.observation.models.coord_velocity = coord_v
 
         self.observation.pmanager = self.pmanager
-        self.optimizer.pmanager = self.pmanager
 
         self.observation.models = self.models
         self.observation.telescope = self.telescope
@@ -90,6 +83,14 @@ class Core:
 
     def standby_fittingparameters(self) -> ParameterManager:
         return ParameterManager(mockobs=self.observation, optimizer=self.optimizer)
+
+    def get_3Dpositiongrids(self) -> tuple[np.ndarray, np.ndarray]:
+        '''Get 3D positional coordinate grids.'''
+        nv, ny, nx = self.data.data.shape
+        coord_yx = np.array(np.meshgrid(np.arange(ny), np.arange(nx), indexing='ij'))
+        coord_yx = np.moveaxis(coord_yx, 0, -1)
+        coord_v = np.arange(nv).reshape((nv, 1, 1))
+        return coord_yx, coord_v
 
 
 @dataclass
