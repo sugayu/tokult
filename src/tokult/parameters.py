@@ -268,8 +268,10 @@ class ParameterManager:
         self.parameters[name] = p
         # self.nparams.append(len(fields(p)))
 
-    def initialvalues(self, seed: int | None = None, ndim: int = 1) -> np.ndarray:
-        init = self._initialvalues[self._index_free]
+    def initialvalues(
+        self, initial: np.ndarray | None = None, seed: int | None = None, ndim: int = 1
+    ) -> np.ndarray:
+        init = self._initialvalues[self._index_free] if initial is None else initial
         if ndim != 1:
             init = np.tile(init, (ndim, 1))
         if seed is not None:

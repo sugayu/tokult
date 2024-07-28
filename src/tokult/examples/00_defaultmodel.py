@@ -51,27 +51,26 @@ def _main():
 
 def main():
     tok = Tokult(data=NDData(np.empty((30, 100, 100))))
-    model = tok.model(
-        (
-            50.0,
-            50.0,
-            0.0,
-            np.pi / 3,
-            10.0,
-            15.0,
-            4.0,
-            50.0,
-            50.0,
-            0.0,
-            np.pi / 3,
-            10.0,
-            10.0,
-            5.0,
-        )
+    param = (
+        50.0,
+        50.0,
+        0.0,
+        np.pi / 3,
+        10.0,
+        15.0,
+        4.0,
+        50.0,
+        50.0,
+        0.0,
+        np.pi / 3,
+        10.0,
+        10.0,
+        5.0,
     )
+    model = tok.model(param)
     tok.data = NDData(model, uncertainty=np.ones((30, 100, 100)) * 0.001)
     tok.optimizer = EmceeMCMC(nwalkers=28, nsteps=3000)
-    sol = tok.runfit()
+    sol = tok.runfit(initial=param)
 
 
 if __name__ == '__main__':

@@ -39,9 +39,9 @@ class Tokult:
             observation=observation,
         )
 
-    def runfit(self) -> Solution:
+    def runfit(self, initial: np.ndarray | None = None) -> Solution:
         '''Run fitting.'''
-        return self.core.runfit()
+        return self.core.runfit(initial=initial)
 
     def model(self, p: tuple[float]) -> np.ndarray:
         '''Build a model.'''

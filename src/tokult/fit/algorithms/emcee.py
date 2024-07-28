@@ -37,13 +37,14 @@ class EmceeMCMC(Optimizer):
         nwalkers: int = 64,
         nsteps: int = 500,
         moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)],
+        init: tuple[float, ...] | None = None,
     ) -> None:
         super().__init__()
         self.nwalkers = nwalkers
         self.nsteps = nsteps
         self.moves = moves
 
-    def optimize(self) -> MCMCSolution:
+    def optimize(self, initial: np.ndarray | None) -> MCMCSolution:
         sampler = emcee.EnsembleSampler(
             self.nwalkers,
             self.ndim,
@@ -53,7 +54,9 @@ class EmceeMCMC(Optimizer):
             moves=self.moves,
         )
         # it's a big confusing, but ndim=self.nwalkers is correct.
-        init = self.pmanager.initialvalues(seed=222, ndim=self.nwalkers)
+        init = self.pmanager.initialvalues(
+            initial=initial, seed=222, ndim=self.nwalkers
+        )
         sampler.run_mcmc(init, self.nsteps)
         return MCMCSolution(sampler)
 

@@ -34,7 +34,7 @@ class Optimizer(ABC):
         self.observation: MockObservation
 
     @abstractmethod
-    def optimize(self) -> Solution:
+    def optimize(self, initial: np.ndarray | None) -> Solution:
         '''Optimize fitting parameters to maximize the probability.'''
         ...
 

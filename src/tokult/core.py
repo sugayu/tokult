@@ -50,7 +50,7 @@ class Core:
         self.optimizer = default.optimizer if optimizer is None else optimizer
         self.pmanager: ParameterManager
 
-    def runfit(self) -> Solution:
+    def runfit(self, initial=np.ndarray | None) -> Solution:
         self.pmanager = self.standby_fittingparameters()
 
         assert len(self.data.data.shape) == 3
@@ -69,7 +69,7 @@ class Core:
         self.optimizer.observation = self.observation
         self.optimizer.data = self.data
 
-        sol = self.optimizer.optimize()
+        sol = self.optimizer.optimize(initial=initial)
         return sol
 
     def build_model(self, p: tuple[float]) -> np.ndarray:
