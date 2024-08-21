@@ -5,10 +5,11 @@ import numpy as np
 from astropy.nddata import NDData
 from tokult import Tokult
 from tokult.fit.algorithms import EmceeMCMC
+from tokult import visualization as vis
 from sugayutils.figure import makefig
 from sugayutils.log import mylogconfig
 
-mylogconfig(level='DEBUG')
+mylogconfig(level='INFO')
 
 
 ##
@@ -41,14 +42,21 @@ def main():
     # fmt:off
     param = (50.0, 50.0, 0.0, np.pi / 3, 10.0, 15.0, 4.0,
              50.0, 50.0, 0.0, np.pi / 3, 10.0, 10.0, 5.0)
-    model = tok.model(param)
-    tok.data = NDData(model, uncertainty=np.ones((30, 100, 100)) * 0.001)
-    tok.optimizer = EmceeMCMC(nwalkers=28, nsteps=100)
+    datamodel = tok.model(param)
+    tok.data = NDData(datamodel, uncertainty=np.ones((30, 100, 100)) * 0.001)
+    tok.optimizer = EmceeMCMC(nwalkers=28, nsteps=5000, progress=True)
     param = (47.0, 52.0, 0.1, np.pi / 4, 12.0, 13.0, 5.0,
              52.0, 49.0, 0.01, np.pi / 2.5, 9.0, 11.0, 4.9)
     # fmt:on
     sol = tok.runfit(initial=param)
 
+    best = np.mean(sol.sampler.get_chain(discard=2000, thin=50, flat=True), axis=0)
+    bestmodel = tok.model(best)
+
+    vis.show_residuals(datamodel, bestmodel)
+
+    return sol
+
 
 if __name__ == '__main__':
-    main()
+    sol = main()

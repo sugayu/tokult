@@ -276,7 +276,7 @@ class ParameterManager:
             init = np.tile(init, (ndim, 1))
         if seed is not None:
             rng = default_rng(seed)
-            fluctuation = 1e-3 * rng.standard_normal(init.shape)
+            fluctuation = 1e-1 * rng.standard_normal(init.shape)
             init += init * fluctuation
             init[init == 0.0] += fluctuation[init == 0.0]
         return init

@@ -20,7 +20,8 @@ class MCMCSolution(Solution):
     ''' '''
 
     def __init__(self, sampler) -> None:
-        flat = sampler.get_chain(discard=300, thin=4, flat=True)
+        self.sampler = sampler
+        flat = sampler.get_chain(discard=2000, thin=50, flat=True)
         logger.info(np.mean(flat, axis=0))
 
     # @classmethod
@@ -37,11 +38,13 @@ class EmceeMCMC(Optimizer):
         nwalkers: int = 64,
         nsteps: int = 500,
         moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)],
+        progress: bool = False,
     ) -> None:
         super().__init__()
         self.nwalkers = nwalkers
         self.nsteps = nsteps
         self.moves = moves
+        self.progress = progress
 
     def optimize(self, initial: np.ndarray | None) -> MCMCSolution:
         sampler = emcee.EnsembleSampler(
@@ -60,7 +63,7 @@ class EmceeMCMC(Optimizer):
         for i in init:
             self.pmanager.warn_if_outside_boundaries(i)
 
-        sampler.run_mcmc(init, self.nsteps)
+        sampler.run_mcmc(init, self.nsteps, progress=self.progress)
         return MCMCSolution(sampler)
 
     def calculate_probability(self, params: tuple[float, ...]) -> float:
