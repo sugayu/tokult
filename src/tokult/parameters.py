@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, is_dataclass
 from copy import deepcopy
 import numpy as np
 from numpy.random import default_rng
+from astropy.nddata import NDData
 import astropy.units as u
 
 from .utils.dataclass import fields, fieldnames
@@ -38,7 +39,7 @@ class FitPar:
 
     unit: u.Unit
     bound: tuple[float, float]
-    initial: float | None
+    initial: float | Callable | None
     fix: float | None = field(init=False, default=None)
 
 
@@ -168,7 +169,7 @@ class ParameterManager:
 
         self._paramkeys: _DotDict
         self._paramindices: dict[str, dict[str, int]] = {}
-        self._initialvalues: np.ndarray
+        self._initialvalues: list[float | Callable]
         self.bounds: np.ndarray
 
         # Initialize
@@ -206,7 +207,7 @@ class ParameterManager:
         index_fixp_to = np.zeros(self.nmax).astype(bool)
         index_func = np.zeros(self.nmax).astype(bool)
         list_func: list[Callable] = []
-        initialvalues: list[float] = []
+        initialvalues: list[float | Callable] = []
         bounds: list[tuple[float, float]] = []
         for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
@@ -241,7 +242,7 @@ class ParameterManager:
         self._index_fixp_to = np.asarray(index_fixp_to)
         self._index_func = np.asarray(index_func)
         self._list_func = list_func
-        self._initialvalues = np.array(initialvalues)
+        self._initialvalues = initialvalues
         self.bounds = np.array(bounds).T[:, self._index_free]
 
     def register(self, klass: object | list[object] | list[object | None]) -> None:
@@ -269,17 +270,52 @@ class ParameterManager:
         # self.nparams.append(len(fields(p)))
 
     def initialvalues(
-        self, initial: np.ndarray | None = None, seed: int | None = None, ndim: int = 1
+        self, initial: np.ndarray | NDData, /, *, seed: int | None = None, ndim: int = 1
     ) -> np.ndarray:
-        init = self._initialvalues[self._index_free] if initial is None else initial
+        '''Give initial values for fitting.
+
+        The output initial values are slightly fluctuated around the input intials.
+        If the argument "initial" is not given, the initial values implemented in models
+        are instead used; therefore they may not be appropreate for your job.
+
+        Args:
+            initial (np.ndarray | None, optional): User intputs of initial parameters.
+                Defaults to None.
+            seed (int | None, optional): Seed of random values. Defaults to None.
+            ndim (int, optional): Dimention of initial parameters. In other words,
+                the number of chains. Defaults to 1.
+
+        Returns:
+            np.ndarray: initial parameters with small fluctuations.
+        '''
+        if isinstance(initial, np.ndarray) and (initial.ndim == 1):
+            init = initial  # intial is initial parameters.
+        if isinstance(initial, np.ndarray) and (initial.ndim > 1):
+            init = self.guessinitial(initial)  # initial is a data cube.
+        if isinstance(initial, NDData):
+            init = self.guessinitial(initial.data)  # initial is a data cube.
+
         if ndim != 1:
             init = np.tile(init, (ndim, 1))
         if seed is not None:
             rng = default_rng(seed)
-            fluctuation = 1e-1 * rng.standard_normal(init.shape)
+            fluctuation = 1e-2 * rng.standard_normal(init.shape)
             init += init * fluctuation
             init[init == 0.0] += fluctuation[init == 0.0]
         return init
+
+    def guessinitial(self, data: np.ndarray) -> np.ndarray:
+        '''Guess initial values from data.'''
+        initial = []
+        for i, boolean in enumerate(self._index_free):
+            if not boolean:
+                continue
+            init = self._initialvalues[i]
+            if isinstance(init, float):
+                initial.append(init)
+            if callable(init):
+                initial.append(init(data))
+        return np.array(initial)
 
     def restore(self, short_parameters: tuple[float, ...]) -> tuple[float, ...]:
         '''Restore a parameter tuple with the complete length.
@@ -389,6 +425,36 @@ class ParameterManager:
             'Initial parameters are outside of boundaries:\n'
             f'Init={p}; {str0}; {str1}'
         )
+
+
+# Following functions are useful for iniital parameter guesses.
+def center_x(data: np.ndarray) -> float:
+    '''Return pixel coordinate of x-axis object center.'''
+    return center(data, key='x')
+
+
+def center_y(data: np.ndarray) -> float:
+    '''Return pixel coordinate of y-axis object center.'''
+    return center(data, key='y')
+
+
+def center_v(data: np.ndarray) -> float:
+    '''Return pixel coordinate of v-axis object center.'''
+    return center(data, key='v')
+
+
+def center(data: np.ndarray, key: str) -> float:
+    '''Return pixel coordinate of object center.'''
+    axes = {'v': (0, (1, 2)), 'y': (1, (0, 2)), 'x': (2, (0, 1))}
+    i, axis = axes[key]
+    spec = np.mean(data, axis=axis)
+    grid = np.arange(data.shape[i])
+    return np.mean(np.mean(spec * grid) / np.mean(spec))
+
+
+def max_brightness(data: np.ndarray) -> float:
+    '''Return maximum brightness in the data.'''
+    return np.max(data)
 
 
 # @dataclass

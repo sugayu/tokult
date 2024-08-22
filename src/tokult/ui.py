@@ -43,7 +43,7 @@ class Tokult:
         '''Run fitting.'''
         return self._core.runfit(initial=initial)
 
-    def model(self, p: tuple[float]) -> np.ndarray:
+    def build_model(self, p: tuple[float]) -> np.ndarray:
         '''Build a model.'''
         return self._core.build_model(p)
 

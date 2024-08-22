@@ -1,19 +1,20 @@
 import numpy as np
 import astropy.units as u
-from ..parameters import ParameterManager, FittingParametersBase, FitPar
+from ..parameters import FitPar
+from .. import parameters as par
 from ..mockobs import MockObservation
 from ..fit.algorithms import EmceeMCMC
 from ..utils.dataclass import fields
 
 
 ##
-class TestParameters(FittingParametersBase):
+class ForTestParameters(par.FittingParametersBase):
     x: FitPar = FitPar(unit=u.pix, bound=(0, np.inf), initial=1.0)
     y: FitPar = FitPar(unit=u.pix, bound=(1.0, 10), initial=2.0)
 
 
 def test_FittingParametersBase():
-    p = TestParameters()
+    p = ForTestParameters()
     assert isinstance(p.x, FitPar)
     assert p.x.initial == 1.0
     p_ntuple = p.namedtuplize((3.0, 2.0))
@@ -21,19 +22,19 @@ def test_FittingParametersBase():
 
     original = p.x.initial
     p.x.initial = 3.0 * original
-    newp = TestParameters()
+    newp = ForTestParameters()
     assert newp.x.initial == original
 
 
 def test_ParameterManager():
-    pmanager = ParameterManager(mockobs=MockObservation(), optimizer=EmceeMCMC())
+    pmanager = par.ParameterManager(mockobs=MockObservation(), optimizer=EmceeMCMC())
     assert pmanager.parameters['FreemanDiskParameters'].x0.fix is None
 
     mockobs = MockObservation()
     mockobs.models.galaxies.kinematic_model.name = 'disk0'
     mockobs.models.galaxies.kinematic_model.p.x0.fix = 5.0
     mockobs.models.galaxies.kinematic_model.p.PA.initial = 2.0
-    pmanager = ParameterManager(mockobs=mockobs, optimizer=EmceeMCMC())
+    pmanager = par.ParameterManager(mockobs=mockobs, optimizer=EmceeMCMC())
     assert np.isinf(pmanager.parameters['disk0'].x0.bound[0])
     assert pmanager.parameters['disk0'].PA.initial == 2.0
 
@@ -49,9 +50,22 @@ def test_ParameterManager():
     assert p_disk0[0] == 5.0
     assert len(p_disk0) == len(fields(mockobs.models.galaxies.kinematic_model.p))
 
-    init = pmanager.initialvalues()
+    # initialvalues needs a input data cube.
+    x, y, v = np.meshgrid(np.arange(11), np.arange(11), np.arange(11))
+    data = (
+        np.exp(-0.5 * (x - 5.0) ** 2)
+        * np.exp(-0.5 * (y - 5.0) ** 2)
+        * np.exp(-0.5 * (v - 5.0) ** 2)
+    )
+    init = pmanager.guessinitial(data)
+    assert pmanager._initialvalues[0] == par.center_x
+    assert init[0] == 5  # kin.x0
+    assert pmanager._initialvalues[12] == par.max_brightness  # emi.brightness_center
+    assert np.isclose(init[11], 1.0)  # 11 because kin.x0 is fiexed here
+
+    init = pmanager.initialvalues(data)
     assert len(init) == len(shortparam)
-    init = pmanager.initialvalues(ndim=3)
+    init = pmanager.initialvalues(data, ndim=3)
     assert init.shape == (3, len(shortparam))
-    init = pmanager.initialvalues(seed=222, ndim=3)
+    init = pmanager.initialvalues(data, seed=222, ndim=3)
     assert init[0, 0] != mockobs.models.galaxies.kinematic_model.p.y0.initial

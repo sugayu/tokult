@@ -56,9 +56,10 @@ class EmceeMCMC(Optimizer):
             moves=self.moves,
         )
         # it's a big confusing, but ndim=self.nwalkers is correct.
-        init = self.pmanager.initialvalues(
-            initial=initial, seed=222, ndim=self.nwalkers
-        )
+        if initial is None:
+            init = self.pmanager.initialvalues(self.data, seed=222, ndim=self.nwalkers)
+        else:
+            init = initial
         # initial check
         for i in init:
             self.pmanager.warn_if_outside_boundaries(i)
