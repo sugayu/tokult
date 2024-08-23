@@ -27,14 +27,18 @@ class ThinDisk(AbstractGalaxyCube):
 
     def __init__(
         self,
-        kinematic_model: AbstractKinematics = FreemanDiskRotation(),
-        brightness_model: AbstractBrightness = ExponentialProfile(),
+        kinematic_model: AbstractKinematics | None = None,
+        brightness_model: AbstractBrightness | None = None,
     ) -> None:
+        if kinematic_model is None:
+            kinematic_model = FreemanDiskRotation()
+        if brightness_model is None:
+            brightness_model = ExponentialProfile()
         super().__init__(
             kinematic_model=kinematic_model,
             brightness_model=brightness_model,
         )
-        self.coord_velocity: np.ndarray
+        self._coord_velocity: np.ndarray
         self.p = ThinDiskParameters()
 
     def output(

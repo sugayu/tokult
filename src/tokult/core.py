@@ -10,7 +10,7 @@ This Core class treats these objects in proper way and passes them to the next c
 including Optimizer.
 '''
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from astropy.nddata import NDData
 
@@ -55,13 +55,13 @@ class Core:
 
         assert len(self.data.data.shape) == 3
         coord_yx, coord_v = self.get_3Dpositiongrids()
+        self.observation.models = self.models
         self.observation.models.coord_yx = coord_yx
         self.observation.models.coord_velocity = coord_v
 
         self.observation.pmanager = self.pmanager
         self.optimizer.pmanager = self.pmanager
 
-        self.observation.models = self.models
         self.observation.telescope = self.telescope
         self.optimizer.observation = self.observation
         self.optimizer.data = self.data
@@ -72,12 +72,12 @@ class Core:
     def build_model(self, p: tuple[float]) -> np.ndarray:
         self.pmanager = self.standby_fittingparameters()
         coord_yx, coord_v = self.get_3Dpositiongrids()
+        self.observation.models = self.models
         self.observation.models.coord_yx = coord_yx
         self.observation.models.coord_velocity = coord_v
 
         self.observation.pmanager = self.pmanager
 
-        self.observation.models = self.models
         self.observation.telescope = self.telescope
         return self.observation(p)
 
@@ -95,8 +95,8 @@ class Core:
 
 @dataclass
 class Defaults:
-    data: NDData = NDData([])
-    optimizer: Optimizer = EmceeMCMC()
-    models: AbstractCubeBuilder = SimpleSkyCubeBuilder()
-    observation: MockObservation = MockObservation()
-    telescope: MockTelescope = MockTelescope()
+    data: NDData = field(default_factory=lambda: NDData([]))
+    optimizer: Optimizer = field(default_factory=EmceeMCMC)
+    models: AbstractCubeBuilder = field(default_factory=SimpleSkyCubeBuilder)
+    observation: MockObservation = field(default_factory=MockObservation)
+    telescope: MockTelescope = field(default_factory=MockTelescope)
