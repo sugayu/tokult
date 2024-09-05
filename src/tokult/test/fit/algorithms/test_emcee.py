@@ -1,9 +1,12 @@
 import numpy as np
 from ....fit.algorithms import EmceeMCMC
+from ....parameters import ParameterManager
 
 
 class MockParameterManager:
     bounds = np.array(([0.0, 1.0, 2.0], [10.0, 20.0, 30.0]))
+
+    within_boundaries = ParameterManager.within_boundaries
 
 
 def test_calcurate_prior():

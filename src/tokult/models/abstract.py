@@ -128,8 +128,8 @@ class AbstractCubeBuilder(ABC):
 
     def __init__(self, galaxy_models: AbstractGalaxyCube) -> None:
         self.pmanager: ParameterManager
-        self.coord_yx: np.ndarray
-        self.coord_velocity: np.ndarray
+        self._coord_yx: np.ndarray
+        self._coord_velocity: np.ndarray
         self.p: FittingParametersBase
         self.galaxies: AbstractGalaxyCube = galaxy_models
 

@@ -7,7 +7,8 @@ import numpy as np
 import scipy.special as sps
 import astropy.units as u
 
-from ...parameters import FittingParametersBase, FitPar
+from ...parameters import FitPar
+from ... import parameters as par
 from ..abstract import AbstractKinematics
 from ..utils import coordinates as coord
 
@@ -16,13 +17,13 @@ from ..utils import coordinates as coord
 inf = np.inf
 
 
-class FreemanDiskParameters(FittingParametersBase):
-    x0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=0.0)
-    y0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=0.0)
+class FreemanDiskParameters(par.FittingParametersBase):
+    x0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=par.center_x)
+    y0: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=par.center_y)
     PA: FitPar = FitPar(unit=u.rad, bound=(0.0, 2 * np.pi), initial=3.0)
     inclination: FitPar = FitPar(unit=u.rad, bound=(0.0, np.pi / 2), initial=1.0)
     radius: FitPar = FitPar(unit=u.pix, bound=(0.0, inf), initial=1.0)
-    velocity_sys: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=1.0)
+    velocity_sys: FitPar = FitPar(unit=u.pix, bound=(-inf, inf), initial=par.center_v)
     mass_dyn: FitPar = FitPar(unit=u.dex(u.pix**3), bound=(-30, 30), initial=1.0)
 
 

@@ -6,20 +6,21 @@
 import numpy as np
 import astropy.units as u
 
-from ...parameters import FittingParametersBase, FitPar
+from ...parameters import FitPar
+from ... import parameters as par
 from ..abstract import AbstractBrightness
 from ..utils import coordinates as coord
 
 
 ##
-class ExponentialProfileParameters(FittingParametersBase):
-    x0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=0.0)
-    y0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=0.0)
+class ExponentialProfileParameters(par.FittingParametersBase):
+    x0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=par.center_x)
+    y0: FitPar = FitPar(unit=u.pix, bound=(-np.inf, np.inf), initial=par.center_y)
     PA: FitPar = FitPar(unit=u.rad, bound=(0.0, 2 * np.pi), initial=3.0)
     inclination: FitPar = FitPar(unit=u.rad, bound=(0.0, np.pi / 2), initial=1.0)
     radius: FitPar = FitPar(unit=u.pix, bound=(0.0, np.inf), initial=1.0)
     brightness_center: FitPar = FitPar(
-        unit=u.Jy / u.pix / u.pix, bound=(0.0, np.inf), initial=0.01
+        unit=u.Jy / u.pix / u.pix, bound=(0.0, np.inf), initial=par.max_brightness
     )
 
 

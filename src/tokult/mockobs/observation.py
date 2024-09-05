@@ -24,9 +24,13 @@ class MockObservation:
 
     def __init__(
         self,
-        models: AbstractCubeBuilder = SimpleSkyCubeBuilder(),
-        telescope=MockTelescope(),
+        models: AbstractCubeBuilder | None = None,
+        telescope: MockTelescope | None = None,
     ) -> None:
+        if models is None:
+            models = SimpleSkyCubeBuilder()
+        if telescope is None:
+            telescope = MockTelescope()
         self.pmanager: ParameterManager
         self.models = models
         self.telescope = telescope

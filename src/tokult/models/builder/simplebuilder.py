@@ -10,7 +10,9 @@ from ..galaxy import ThinDisk
 class SimpleSkyCubeBuilder(AbstractCubeBuilder):
     '''The most simple cube builder.'''
 
-    def __init__(self, galaxy_models: AbstractGalaxyCube = ThinDisk()) -> None:
+    def __init__(self, galaxy_models: AbstractGalaxyCube | None = None) -> None:
+        if galaxy_models is None:
+            galaxy_models = ThinDisk()
         super().__init__(galaxy_models)
 
     def build(self, p) -> np.ndarray:
