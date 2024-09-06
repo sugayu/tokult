@@ -176,7 +176,7 @@ class ParameterManager:
         self.register(mockobs.models.galaxies.kinematic_model)
         self.register(mockobs.models.galaxies.brightness_model)
         self.register(mockobs.models.galaxies)
-        self.register(mockobs.telescope.components)
+        self.register(mockobs.telescope.layers)
         self.register(optimizer)
 
         self.standby()

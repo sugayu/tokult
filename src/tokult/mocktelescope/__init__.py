@@ -2,5 +2,6 @@
 '''
 
 from .telescope import MockTelescope
+from .psfconvolve import PointSpreadFunction
 
-__all__ = ['MockTelescope']
+__all__ = ['MockTelescope', 'PointSpreadFunction']

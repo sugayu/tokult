@@ -46,10 +46,10 @@ def rfft2(cube: np.ndarray) -> np.ndarray:
     return uvcube
 
 
-def irfft2(uvcube: np.ndarray) -> np.ndarray:
+def irfft2(uvcube: np.ndarray, shape: tuple[int, ...] | None = None) -> np.ndarray:
     '''Inverse 2 dimensional real Fourier transform.'''
     cube_shift = np.fft.ifftshift(uvcube, axes=1)
-    cube_shift = np.fft.irfft2(cube_shift, norm='forward')
+    cube_shift = np.fft.irfft2(cube_shift, s=shape, norm='forward')
     cube = np.fft.fftshift(cube_shift, axes=(1, 2))
     return cube
 
@@ -73,7 +73,7 @@ def fftconvolve(
     if uvcoverage is not None:
         uv_noise[np.logical_not(uvcoverage)] = 0.0
 
-    return irfft2(uv_noise)
+    return irfft2(uv_noise, shape=image[0, :, :].shape)
 
     # image_full = sp_fftconvolve(image, kernel, mode='full', axes=axes)
 

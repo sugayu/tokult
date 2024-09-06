@@ -22,9 +22,9 @@ def show_residuals(data: np.ndarray, model: np.ndarray) -> None:
     axs = fig.subplots(1, 3)
     fig.subplots_adjust(left=0.1, right=0.9, bottom=0.15, top=0.90)
 
-    im0 = axs[0].imshow(data[0], vmin=vmin, vmax=vmax)
-    im1 = axs[1].imshow(model[0], vmin=vmin, vmax=vmax)
-    im2 = axs[2].imshow(residual[0], vmin=vmin, vmax=vmax)
+    im0 = axs[0].imshow(data[0], vmin=vmin, vmax=vmax, origin='lower')
+    im1 = axs[1].imshow(model[0], vmin=vmin, vmax=vmax, origin='lower')
+    im2 = axs[2].imshow(residual[0], vmin=vmin, vmax=vmax, origin='lower')
 
     titles = ['Data', 'Model', 'Residual']
     for ax, title in zip(axs, titles):
