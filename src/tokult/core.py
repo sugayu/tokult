@@ -85,7 +85,14 @@ class Core:
         return ParameterManager(mockobs=self.observation, optimizer=self.optimizer)
 
     def get_3Dpositiongrids(self) -> tuple[np.ndarray, np.ndarray]:
-        '''Get 3D positional coordinate grids.'''
+        '''Get 3D positional coordinate grids.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Output grids. The first array is coordinates on the y-x axes.
+                The array shape is expected to be (ny, nx, 2); coord_yx[:,:,0] shows the x-grid and
+                coord_yx[:,:,1] shows the y-grid. The second array is a coordinate on the velocity axis
+                with the shape of (nv, 1, 1).
+        '''
         nv, ny, nx = self.data.data.shape
         coord_yx = np.array(np.meshgrid(np.arange(ny), np.arange(nx), indexing='ij'))
         coord_yx = np.moveaxis(coord_yx, 0, -1)

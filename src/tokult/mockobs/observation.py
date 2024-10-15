@@ -36,9 +36,9 @@ class MockObservation:
         self.telescope = telescope
 
     def __call__(self, p: tuple[float, ...]) -> np.ndarray:
-        return self.be_conducted(p)
+        return self.run(p)
 
-    def be_conducted(self, p: tuple[float, ...]) -> np.ndarray:
+    def run(self, p: tuple[float, ...]) -> np.ndarray:
         '''Give model data cube generated from the input parameters.'''
         fullparam = self.pmanager.restore(p)
         self.models.pmanager = self.pmanager

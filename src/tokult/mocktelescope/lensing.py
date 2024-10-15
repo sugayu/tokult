@@ -1,9 +1,41 @@
+'''Gravitational lensing.
+'''
+
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from astropy import wcs
+from .gridconvert import GridConverter
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
-class GravLens:
+class GravLens(GridConverter):
+    '''Change coordinates according to a given gravitaitonal lens map.
+
+    This class provides simple converter of the pixel grids. If you want to use misc functions
+    to treat lensing effects, use a class XXX instead.
+
+    Attributes:
+        lensmap [np.ndarray]: Array including pixel deflection maps with shape of (ny, nx, 2),
+            which is the same as the original (input) grids. lensmap[:,:,0] includes x-direction
+            and lensmap[:,:,1] includes y-direction.
+    '''
+
+    def __init__(self, lensmap: np.ndarray) -> None:
+        self.pixel_deflect = lensmap
+        super().__init__()
+
+    def convert(self, grids: np.ndarray) -> np.ndarray:
+        '''Main method to change the grid coordinate.'''
+        newgrids = (
+            grids[:, :, 0] - self.pixel_deflect[:, :, 0],  # x
+            grids[:, :, 1] - self.pixel_deflect[:, :, 1],  # y
+        )
+        return np.array(newgrids)
+
+
+class PreviousGravLens:
     '''Deal with gravitational lensing effects based on a given lens models.
 
     Contents are lensing parameters depending on positions.
