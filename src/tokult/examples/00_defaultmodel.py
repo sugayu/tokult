@@ -38,27 +38,38 @@ def _main():
 
 
 def main():
+    shape = (30, 100, 100)
+
     # PSF
-    xx, yy = np.meshgrid(np.arange(100), np.arange(100))
+    xx, yy = np.meshgrid(np.arange(shape[1]), np.arange(shape[2]))
     psf = (
         np.exp(-0.5 * (xx - 50) ** 2 / 2.0**2)
         * np.exp(-0.5 * (yy - 50) ** 2 / 2.0**2)
         / (2 * np.pi * 2.0**2)
     )
 
-    tok = tokult.Tokult(data=NDData(np.empty((30, 100, 100))))
+    tok = tokult.Tokult(data=NDData(np.empty(shape)))
     # fmt:off
     param = (50.0, 50.0, np.pi / 2, np.pi / 3, 10.0, 15.0, 4.0,
              50.0, 50.0, np.pi / 2, np.pi / 3, 10.0, 8.0, 5.0)
     # fmt:on
     telescope = tokult.mocktelescope.MockTelescope()
     telescope.layers.append(tokult.mocktelescope.PointSpreadFunction(psf))
+
+    # gravitational lensing
+    mesh = np.meshgrid(np.arange(100), np.arange(100))
+    meshsum = mesh[0] + mesh[1]
+    pixel_deflect = np.moveaxis(
+        np.array((-meshsum / 10 - 10.0, -meshsum / 1000 * mesh[0] - 10.0)), 0, -1
+    )
+    telescope.layers.append(tokult.mocktelescope.GravLens(pixel_deflect))
+
     tok.telescope = telescope
     datamodel = tok.build_model(param)
 
     rng = default_rng(222)
-    noise = rng.standard_normal((30, 100, 100)) * 0.05
-    tok.data = NDData(datamodel + noise, uncertainty=np.ones((30, 100, 100)) * 0.05)
+    noise = rng.standard_normal(shape) * 0.05
+    tok.data = NDData(datamodel + noise, uncertainty=np.ones(shape) * 0.05)
 
     kin = tokult.models.kinematics.FreemanDiskRotation()
     kin.name = 'kinematics'

@@ -23,10 +23,11 @@ class GridConverter(TelescopeLayer):
     def __init__(self) -> None:
         super().__init__()
 
-    def __call__(self, grids: np.ndarray) -> np.ndarray:
-        return self.convert(grids)
+    def __call__(self, sky: np.ndarray) -> np.ndarray:
+        '''This class do nothing to the sky model.'''
+        return sky
 
     @abstractmethod
-    def convert(self, sky: np.ndarray) -> np.ndarray:
+    def gridconvert(self, grids: np.ndarray) -> np.ndarray:
         '''Main method to convert the grid coordinate.'''
         pass
