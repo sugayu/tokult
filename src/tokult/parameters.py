@@ -41,6 +41,7 @@ class FitPar:
     bound: tuple[float, float]
     initial: float | Callable | None
     fix: float | None = field(init=False, default=None)
+    converter: Callable | None = field(init=False, default=None)
 
 
 @dataclass_transform()
@@ -152,7 +153,7 @@ class ParameterManager:
         # Attributes
         # As dict holds the order from Python 3.7, dict is used instead of OrderedDict.
         self.parameters: dict[str, FittingParametersBase] = dict()
-        self.nmax: int
+        self.nmax: int  # number of maximum, i.e., all of the parameters
         # self.nparams: list[int] = []
         self._slices: list[slice] = []
 
@@ -165,12 +166,14 @@ class ParameterManager:
         self._index_fixp_to: np.ndarray
 
         self._index_func: np.ndarray
-        self._list_func: list[Callable]
+        self._list_fixfunc: list[Callable]
 
         self._paramkeys: _DotDict
         self._paramindices: dict[str, dict[str, int]] = {}
         self._initialvalues: list[float | Callable]
         self.bounds: np.ndarray
+
+        self._converters: list[None | Callable]
 
         # Initialize
         self.register(mockobs.models.galaxies.kinematic_model)
@@ -205,10 +208,11 @@ class ParameterManager:
         fixed_values = []
         index_fixp_from: list[int] = []
         index_fixp_to = np.zeros(self.nmax).astype(bool)
-        index_func = np.zeros(self.nmax).astype(bool)
-        list_func: list[Callable] = []
+        index_fixfunc = np.zeros(self.nmax).astype(bool)
+        list_fixfunc: list[Callable] = []
         initialvalues: list[float | Callable] = []
         bounds: list[tuple[float, float]] = []
+        converters: list[None | Callable] = []
         for name, parambase in self.parameters.items():
             for pname in fieldnames(parambase):
 
@@ -221,6 +225,7 @@ class ParameterManager:
                     initialvalues.append((p.bound[0] + p.bound[1]) / 2.0)
 
                 bounds.append(p.bound)
+                converters.append(p.converter)
 
                 if p.fix is None:
                     index_free[i] = True
@@ -232,18 +237,19 @@ class ParameterManager:
                     index_fixp_from.append(self._paramindices[key0][key1])
                     index_fixp_to[i] = True
                 if callable(p.fix):
-                    index_func[i] = True
-                    list_func.append(p.fix)
+                    index_fixfunc[i] = True
+                    list_fixfunc.append(p.fix)
 
         self._index_free = np.asarray(index_free)
         self._index_fix_float = np.asarray(index_fix_float)
         self._fixed_values = np.asarray(fixed_values)
         self._index_fixp_from = np.asarray(index_fixp_from)
         self._index_fixp_to = np.asarray(index_fixp_to)
-        self._index_func = np.asarray(index_func)
-        self._list_func = list_func
+        self._index_func = np.asarray(index_fixfunc)
+        self._list_fixfunc = list_fixfunc
         self._initialvalues = initialvalues
         self.bounds = np.array(bounds).T[:, self._index_free]
+        self._converters = converters
 
     def register(self, klass: object | list[object] | list[object | None]) -> None:
         '''Add fitting parameters to internal dict to make the complete fit-par list.'''
@@ -352,11 +358,11 @@ class ParameterManager:
 
         # where are computed in functions
         if np.any(self._index_func):
-            fullparams[self._index_func] = [f(fullparams) for f in self._list_func]
+            fullparams[self._index_func] = [f(fullparams) for f in self._list_fixfunc]
 
         if np.any(np.isnan(fullparams)):
             raise ValueError(
-                'Some of the fitting parameters are not well-defined, including None: '
+                'Some of the fitting parameters are not well-defined, including Nan: '
                 f'{fullparams}'
             )
 
@@ -394,8 +400,33 @@ class ParameterManager:
         index = list(self.parameters.keys()).index(name)
         return full_parameters[self._slices[index]]
 
+    def convert(self, params: tuple[float, ...]) -> tuple[float, ...]:
+        '''Convert the input parameters using given converter functions.
+
+        Converter functions are individually given for FitPar.
+
+        Args:
+            params (tuple[float, ...]): Parameter tuple. The length of the parameters
+                should be the same as either of the full or short parameters.
+
+        Returns:
+            tuple[float, ...]: Converted parameters.
+        '''
+        if len(params) == self.nmax:
+            converters = self._converters
+        elif len(params) == self.nparams:
+            converters = [c for c, i in zip(self._converters, self._index_free) if i]
+        else:
+            raise ValueError(
+                'The length of the input parameter tuple must be '
+                f'{self.nparams} (full) or {self.nmax} (short), '
+                f'but the input paramter has {len(params)} parameters.'
+            )
+        return tuple([p if f is None else f(p) for p, f in zip(params, converters)])
+
     @property
     def nparams(self) -> int:
+        '''Number of free parameters; in other words, short parameters.'''
         return np.count_nonzero(self._index_free)
 
     def within_boundaries(self, p: tuple[float, ...] | np.ndarray) -> bool:

@@ -20,7 +20,13 @@ if TYPE_CHECKING:
 
 ##
 class MockObservation:
-    '''Mock observation of a galaxy model using a mock telescope.'''
+    '''Mock observation of a galaxy model using a mock telescope.
+
+    Responsibility:
+        - Recieve a fitting parameter set from users and Optimizer.
+        - Build a sky cube and then observe the sky to obtain the mock data cube.
+        - Retrun the observed cube data.
+    '''
 
     def __init__(
         self,
@@ -40,10 +46,10 @@ class MockObservation:
 
     def run(self, p: tuple[float, ...]) -> np.ndarray:
         '''Give model data cube generated from the input parameters.'''
-        fullparam = self.pmanager.restore(p)
+        fullparam = self.pmanager.restore(self.pmanager.convert(p))
         self.models.pmanager = self.pmanager
-        galaxy = self.models.build(fullparam)
+        cube_sky = self.models.build(fullparam)
 
         # p_telescope = self.pmanager.extract(fullparam)
-        cube = self.telescope.observe(galaxy)
-        return cube
+        cube_obs = self.telescope.observe(cube_sky)
+        return cube_obs

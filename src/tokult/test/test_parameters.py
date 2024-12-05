@@ -30,25 +30,42 @@ def test_ParameterManager():
     pmanager = par.ParameterManager(mockobs=MockObservation(), optimizer=EmceeMCMC())
     assert pmanager.parameters['FreemanDiskParameters'].x0.fix is None
 
+    factor_conv = 1.2
+
+    def convert_rad(p) -> float:
+        return factor_conv * p
+
     mockobs = MockObservation()
     mockobs.models.galaxies.kinematic_model.name = 'disk0'
     mockobs.models.galaxies.kinematic_model.p.x0.fix = 5.0
+    mockobs.models.galaxies.kinematic_model.p.radius.converter = convert_rad
     mockobs.models.galaxies.kinematic_model.p.PA.initial = 2.0
     pmanager = par.ParameterManager(mockobs=mockobs, optimizer=EmceeMCMC())
     assert np.isinf(pmanager.parameters['disk0'].x0.bound[0])
+    assert pmanager.parameters['disk0'].y0.converter is None
     assert pmanager.parameters['disk0'].PA.initial == 2.0
+    assert callable(pmanager.parameters['disk0'].radius.converter)
 
     longparam = tuple(np.arange(pmanager.nmax, dtype=float))
     shortparam = pmanager.shorten(longparam)
     longparam2 = pmanager.restore(shortparam)
     p_disk0 = pmanager.extract(longparam2, 'disk0')
     assert len(shortparam) == pmanager.nparams
-    assert longparam[0] != longparam2[0]
+    assert longparam[0] != longparam2[0]  # becuase x0 is fixed to 5.0
     assert longparam2[0] == 5.0
     assert longparam[1:] == longparam2[1:]
     assert longparam[1:] == shortparam
     assert p_disk0[0] == 5.0
     assert len(p_disk0) == len(fields(mockobs.models.galaxies.kinematic_model.p))
+
+    # convert
+    shortparam_conv = pmanager.convert(shortparam)
+    longparam_conv = pmanager.convert(longparam2)
+    assert len(shortparam_conv) == len(shortparam)
+    assert len(longparam_conv) == len(longparam2)
+    assert pmanager.parameters['disk0'].radius.initial == 1.0
+    assert shortparam_conv[3] == shortparam[3] * factor_conv  # radius = 1.0 x 1.2
+    assert longparam_conv[4] == longparam[4] * factor_conv
 
     # initialvalues needs a input data cube.
     x, y, v = np.meshgrid(np.arange(11), np.arange(11), np.arange(11))

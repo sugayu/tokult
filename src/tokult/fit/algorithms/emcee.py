@@ -55,7 +55,7 @@ class EmceeMCMC(Optimizer):
             # pool=pool,
             moves=self.moves,
         )
-        # it's a big confusing, but ndim=self.nwalkers is correct.
+        # it's a big confusion, but ndim=self.nwalkers is correct.
         if initial is None:
             init = self.pmanager.initialvalues(self.data, seed=222, ndim=self.nwalkers)
         else:
@@ -68,7 +68,10 @@ class EmceeMCMC(Optimizer):
         return MCMCSolution(sampler)
 
     def calculate_probability(self, params: tuple[float, ...]) -> float:
-        '''Calcurate log probability.'''
+        '''Calcurate log probability.
+
+        This is an entry point of the emcee probability calculations.
+        '''
         log_prior = self.calculate_prior(params)
         if not np.isfinite(log_prior):
             return -np.inf

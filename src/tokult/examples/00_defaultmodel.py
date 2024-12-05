@@ -81,6 +81,8 @@ def main():
     emi.p.PA.fix = 'kinematics.PA'
     emi.p.inclination.fix = 'kinematics.inclination'
     emi.p.radius.fix = 'kinematics.radius'
+    emi.p.x0.bound = (0.0, float(shape[2]))
+    emi.p.y0.bound = (0.0, float(shape[1]))
 
     tok.models.galaxies.kinematic_model = kin
     tok.models.galaxies.brightness_model = emi
