@@ -24,7 +24,21 @@ class GravLens(GridConverter):
 
     def __init__(self, lensmap: np.ndarray) -> None:
         self.pixel_deflect = lensmap
+        self.original_grids = np.moveaxis(
+            np.meshgrid(np.arange(lensmap.shape[1]), np.arange(lensmap.shape[0])), 0, -1
+        )
+        self.gridconvert_already_used = False
+        self._interpolate_x: RectBivariateSpline
+        self._interpolate_y: RectBivariateSpline
         super().__init__()
+
+    @property
+    def pixel_deflect_x(self) -> np.ndarray:
+        return self.pixel_deflect[:, :, 0]
+
+    @property
+    def pixel_deflect_y(self) -> np.ndarray:
+        return self.pixel_deflect[:, :, 1]
 
     def gridconvert(self, grids: np.ndarray) -> np.ndarray:
         '''Main method to change the grid coordinate.'''
@@ -37,11 +51,63 @@ class GravLens(GridConverter):
             logger.error(msg)
             raise ValueError(msg)
 
+        self.gridconvert_already_used = True
+        self.original_grids = grids
         newgrids = (
-            grids[:, :, 0] - self.pixel_deflect[:, :, 0],  # x
-            grids[:, :, 1] - self.pixel_deflect[:, :, 1],  # y
+            grids[:, :, 0] - self.pixel_deflect_x,  # x
+            grids[:, :, 1] - self.pixel_deflect_y,  # y
         )
         return np.moveaxis(np.array(newgrids), 0, -1)
+
+    # TODO
+    def convert_x(self, x: float) -> float:
+        '''Convert x coordinate from a image plane to a source plane.'''
+        return x
+
+    # TODO
+    def convert_y(self, y: float) -> float:
+        '''Convert y coordinate from a image plane to a source plane.'''
+        return y
+
+    # FIXME
+    def inerpolate_x(self, x: float) -> float:
+        '''Interpolate x [pix] position from (y,x).'''
+        if not self.gridconvert_already_used:
+            logger.warning(
+                'GravLens.original_grids is a default value, which may not be '
+                'a grid you want to use.'
+                'First use GravLens.gridconvert() to surely define the grids.'
+            )
+
+        try:
+            self._interpolate_x
+        except AttributeError:
+            self._interpolate_x = RectBivariateSpline(
+                self.original_grids[:, :, 1],
+                self.original_grids[:, :, 0],
+                self.pixel_deflect_x,
+            )
+        return self._interpolate_x(y, x)
+
+    # FIXME
+    def inerpolate_y(self, y: float) -> float:
+        '''Interpolate y [pix] position from (y,x).'''
+        if not self.gridconvert_already_used:
+            logger.warning(
+                'GravLens.original_grids is a default value, which may not be '
+                'a grid you want to use.'
+                'First use GravLens.gridconvert() to surely define the grids.'
+            )
+
+        try:
+            self._interpolate_y
+        except AttributeError:
+            self._interpolate_y = RectBivariateSpline(
+                self.original_grids[:, :, 1],
+                self.original_grids[:, :, 0],
+                self.pixel_deflect_y,
+            )
+        return self._interpolate_y(y, x)
 
 
 # class PreviousGravLens:

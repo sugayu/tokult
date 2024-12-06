@@ -62,7 +62,8 @@ def main():
     pixel_deflect = np.moveaxis(
         np.array((-meshsum / 10 - 10.0, -meshsum / 1000 * mesh[0] - 10.0)), 0, -1
     )
-    telescope.layers.append(tokult.mocktelescope.GravLens(pixel_deflect))
+    gravlens = tokult.mocktelescope.GravLens(pixel_deflect)
+    telescope.layers.append(gravlens)
 
     tok.telescope = telescope
     datamodel = tok.build_model(param)
@@ -83,6 +84,8 @@ def main():
     emi.p.radius.fix = 'kinematics.radius'
     emi.p.x0.bound = (0.0, float(shape[2]))
     emi.p.y0.bound = (0.0, float(shape[1]))
+    emi.p.x0.converter = gravlens.convert_x
+    emi.p.y0.converter = gravlens.convert_y
 
     tok.models.galaxies.kinematic_model = kin
     tok.models.galaxies.brightness_model = emi
