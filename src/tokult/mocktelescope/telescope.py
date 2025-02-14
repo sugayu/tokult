@@ -8,7 +8,7 @@ import numpy as np
 if TYPE_CHECKING:
     from ..parameters import FittingParametersBase
 
-__all__ = ['MockTelescope']
+__all__ = ['MockTelescope', 'TelescopeLayer']
 
 
 ##
@@ -16,15 +16,24 @@ class MockTelescope:
     '''Telescope-like class to provide mock observations.'''
 
     def __init__(self) -> None:
-        self.components: list[TelescopeComponent] = []
+        self.layers: list[TelescopeLayer] = []
 
-    def observe(self, obj: np.ndarray) -> np.ndarray:
-        '''Mock observation of the model object (image or cube).'''
-        return obj
+    def observe(self, skymodel: np.ndarray) -> np.ndarray:
+        '''Mock observation of the skymodel (image or cube).'''
+        if not self.layers:
+            return skymodel
+
+        _skymodel = skymodel.copy()
+        for layer in self.layers:
+            _skymodel = layer(_skymodel)
+        return _skymodel
 
 
-class TelescopeComponent(ABC):
-    '''Components that transform model cubes during observations.'''
+class TelescopeLayer(ABC):
+    '''Layer that transform model cubes during observations.'''
 
     def __init__(self) -> None:
         self.p: FittingParametersBase | None
+
+    @abstractmethod
+    def __call__(self, sky: np.ndarray) -> np.ndarray: ...

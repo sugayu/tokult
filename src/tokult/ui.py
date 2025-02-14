@@ -74,12 +74,20 @@ class Tokult:
         self._core.optimizer = value
 
     @property
-    def observation(self) -> MockObservation:
-        return self._core.observation
+    def telescope(self) -> MockTelescope:
+        return self._core.telescope
 
-    @observation.setter
-    def observation(self, value: MockObservation) -> None:
-        self._core.observation = value
+    @telescope.setter
+    def telescope(self, value: MockTelescope) -> None:
+        self._core.telescope = value
+
+    @property
+    def models(self) -> AbstractCubeBuilder:
+        return self._core.models
+
+    @models.setter
+    def models(self, value: AbstractCubeBuilder) -> None:
+        self._core.models = value
 
 
 # import numpy as np
