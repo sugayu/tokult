@@ -53,6 +53,8 @@ def main():
     param = (50.0, 50.0, np.pi / 2, np.pi / 3, 10.0, 15.0, 4.0,
              50.0, 50.0, np.pi / 2, np.pi / 3, 10.0, 8.0, 5.0)
     # fmt:on
+
+    # point spread function
     telescope = tokult.mocktelescope.MockTelescope()
     telescope.layers.append(tokult.mocktelescope.PointSpreadFunction(psf))
 
@@ -91,7 +93,7 @@ def main():
     tok.models.galaxies.brightness_model = emi
 
     tok.optimizer = tokult.fit.algorithms.EmceeMCMC(
-        nwalkers=28, nsteps=5000, progress=True
+        nwalkers=28, nsteps=500, progress=True
     )
 
     sol = tok.runfit()

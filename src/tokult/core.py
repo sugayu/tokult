@@ -73,7 +73,7 @@ class Core:
         sol = self.optimizer.optimize(initial=initial)
         return sol
 
-    def build_model(self, p: tuple[float]) -> np.ndarray:
+    def build_model(self, p: tuple[float, ...]) -> np.ndarray:
         self.pmanager = self.standby_fittingparameters()
 
         coord_yx, coord_v = self.get_3Dpositiongrids()
