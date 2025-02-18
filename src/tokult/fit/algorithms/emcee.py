@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from logging import getLogger
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import emcee
 from emcee.moves import DEMove, DESnookerMove
@@ -39,12 +40,14 @@ class EmceeMCMC(Optimizer):
         nsteps: int = 500,
         moves: list = [(DEMove(), 0.8), (DESnookerMove(), 0.2)],
         progress: bool = False,
+        executor: ProcessPoolExecutor | None = None,
     ) -> None:
         super().__init__()
         self.nwalkers = nwalkers
         self.nsteps = nsteps
         self.moves = moves
         self.progress = progress
+        self.executor = executor
 
     def optimize(self, initial: np.ndarray | None) -> MCMCSolution:
         sampler = emcee.EnsembleSampler(
@@ -52,7 +55,7 @@ class EmceeMCMC(Optimizer):
             self.ndim,
             self.calculate_probability,
             # args=args,
-            # pool=pool,
+            pool=self.executor,
             moves=self.moves,
         )
         # it's a big confusion, but ndim=self.nwalkers is correct.

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 from logging import getLogger
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 from astropy.nddata import NDData
@@ -32,6 +33,7 @@ class Optimizer(ABC):
         self.pmanager: ParameterManager
         self.data: NDData
         self.observation: MockObservation
+        self.executor: ProcessPoolExecutor | None = None
 
     @abstractmethod
     def optimize(self, initial: np.ndarray | None) -> Solution:
@@ -56,6 +58,11 @@ class Optimizer(ABC):
     def modeling(self, p: tuple[float, ...]) -> np.ndarray:
         '''Give model data cube generated from the input parameters.'''
         return self.observation(p)
+
+    def __getstate__(self) -> dict:
+        _dict = self.__dict__
+        _dict['executor'] = None
+        return _dict
 
 
 # def initialize_data(

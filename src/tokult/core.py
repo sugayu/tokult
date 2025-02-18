@@ -11,6 +11,8 @@ including Optimizer.
 '''
 
 from dataclasses import dataclass, field
+from multiprocessing.managers import SharedMemoryManager
+
 import numpy as np
 from astropy.nddata import NDData
 
@@ -19,6 +21,7 @@ from .models import AbstractCubeBuilder
 from .mocktelescope import MockTelescope, GridConverter
 from .mockobs import MockObservation
 from .parameters import ParameterManager
+from .data.sharedmemory import SharedMemoryNDData
 
 # for defaults
 from .fit.algorithms import EmceeMCMC
@@ -68,9 +71,15 @@ class Core:
 
         self.observation.telescope = self.telescope
         self.optimizer.observation = self.observation
-        self.optimizer.data = self.data
 
-        sol = self.optimizer.optimize(initial=initial)
+        if self.optimizer.executor is not None:
+            with SharedMemoryManager() as smm:
+                self.optimizer.data = SharedMemoryNDData(self.data, smmanager=smm)
+                sol = self.optimizer.optimize(initial=initial)
+        else:
+            self.optimizer.data = self.data
+            sol = self.optimizer.optimize(initial=initial)
+
         return sol
 
     def build_model(self, p: tuple[float, ...]) -> np.ndarray:
