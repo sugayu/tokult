@@ -4,6 +4,7 @@ This function would be helpful to reduce a memory size in multi-process fitting.
 '''
 
 import os
+from copy import deepcopy
 from multiprocessing import shared_memory
 from multiprocessing.managers import SharedMemoryManager
 import numpy as np
@@ -33,7 +34,8 @@ class SharedMemoryNDData(NDData):
         self._data_shm: SharedNDArray
         self._mask_shm: SharedNDArray | None
         self._uncertainty_shm: SharedNDArray
-        self._uncertainty_tmp: NDUncertainty
+        self._uncertainty_template: NDUncertainty
+        self._uncertainty_cache: NDUncertainty | None = None
 
     def close(self) -> None:
         self._data_shm.close()
@@ -43,7 +45,7 @@ class SharedMemoryNDData(NDData):
 
     @property
     def is_subprocess(self) -> bool:
-        '''Check if the current process is created by pickle.'''
+        '''Check if it is a subprocess where the object is created by pickle.'''
         return self.smm is None
 
     @property
@@ -53,7 +55,7 @@ class SharedMemoryNDData(NDData):
     @_data.setter
     def _data(self, data: np.ndarray) -> None:
         if self.is_subprocess:
-            raise ValueError('Attributes cannot be set in subprocess.')
+            raise ValueError('Attributes cannot be set in a subprocess.')
         self._data_shm = SharedNDArray(data, self.smm)
 
     @property
@@ -68,25 +70,29 @@ class SharedMemoryNDData(NDData):
             self._mask_shm = None
             return
         if self.is_subprocess:
-            raise ValueError('Attributes cannot be set in subprocess.')
+            raise ValueError('Attributes cannot be set in a subprocess.')
         self._mask_shm = SharedNDArray(data, self.smm)
 
     @property
     def _uncertainty(self) -> NDUncertainty:
-        self._uncertainty_tmp.array = self._uncertainty_shm.data
-        return self._uncertainty_tmp
+        if self._uncertainty_cache is None:
+            self._uncertainty_cache = deepcopy(self._uncertainty_template)
+            self._uncertainty_cache.array = self._uncertainty_shm.data
+        return self._uncertainty_cache
 
     @_uncertainty.setter
     def _uncertainty(self, uncertainty: NDUncertainty) -> None:
         if self.is_subprocess:
-            raise ValueError('Attributes cannot be set in subprocess.')
+            raise ValueError('Attributes cannot be set in a subprocess.')
         self._uncertainty_shm = SharedNDArray(uncertainty.array, self.smm)
         uncertainty.array = np.array([])
-        self._uncertainty_tmp = uncertainty
+        self._uncertainty_template = uncertainty
+        self._uncertainty_cache = None
 
     def __getstate__(self) -> dict:
         _dict = self.__dict__
         _dict['smm'] = None
+        _dict['_uncertainty_cache'] = None
         return _dict
 
 
