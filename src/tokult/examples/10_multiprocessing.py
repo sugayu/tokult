@@ -1,11 +1,11 @@
-'''Simple example using default thindisk models.
+'''Multiprocesssing of Tokult fitting.
 '''
 
+from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 from numpy.random import default_rng
 from astropy.nddata import NDData
 import tokult
-from tokult import visualization as vis
 from sugayutils.figure import makefig
 from sugayutils.log import mylogconfig
 
@@ -72,6 +72,7 @@ def main():
 
     rng = default_rng(222)
     noise = rng.standard_normal(shape) * 0.05
+
     tok.data = NDData(datamodel + noise, uncertainty=np.ones(shape) * 0.05)
 
     kin = tokult.models.kinematics.FreemanDiskRotation()
@@ -92,17 +93,11 @@ def main():
     tok.models.galaxies.kinematic_model = kin
     tok.models.galaxies.brightness_model = emi
 
-    tok.optimizer = tokult.fit.algorithms.EmceeMCMC(
-        nwalkers=28, nsteps=500, progress=True
-    )
-
-    sol = tok.runfit()
-
-    chain = sol.sampler.get_chain(thin=50)
-    best = np.mean(sol.sampler.get_chain(discard=1000, thin=50, flat=True), axis=0)
-    bestmodel = tok.build_model(best)
-
-    vis.show_residuals(datamodel + noise, bestmodel)
+    with ProcessPoolExecutor(4) as executor:
+        tok.optimizer = tokult.fit.algorithms.EmceeMCMC(
+            nwalkers=28, nsteps=50, progress=True, executor=executor
+        )
+        sol = tok.runfit()
 
     return sol
 

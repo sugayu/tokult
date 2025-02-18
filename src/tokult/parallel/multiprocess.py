@@ -1,4 +1,9 @@
 '''Multi process.
+
+List of Shared Memory data:
+- data (incl. data, mask, uncertainty)
+- ParameterManager
+- Some TelescopeLayers including PointSpreadFunction, GravLens, ...
 '''
 
 
