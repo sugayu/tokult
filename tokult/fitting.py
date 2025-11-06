@@ -1,5 +1,6 @@
 '''Modules of fitting functions
 '''
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 
@@ -1261,7 +1262,7 @@ def initialize_globalparameters_for_moment(
     elif mom == 1:
         rms = datacube.rms_moment0()
         cube = datacube.pixmoment1(thresh=3 * rms)
-        idx = np.isfinite(cube) and mask.squeeze()
+        idx = np.isfinite(cube) & mask.squeeze()
         cube = cube[idx]  # cube becomes 1d
         mom0 = datacube.moment0()[idx]
         cube_error = 1 / np.sqrt(mom0)
